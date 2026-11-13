@@ -1,4 +1,4 @@
-# WarungAdam - Requirement Tracker
+# BizManage - Requirement Tracker
 
 Dokumen ini digunakan untuk memantau status kebutuhan sistem berdasarkan mind map, jawaban klien, dan keputusan teknis developer.
 

@@ -1,1007 +1,397 @@
-# SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
-
-**Nama Proyek:** WarungAdam — Sistem Kasir dan Manajemen Usaha  
-**Versi:** 0.2 — Draft Baseline  
-**Tanggal:** 12 November 2026  
-**Status:** Draft untuk Pengembangan dan Validasi Kebutuhan  
-**Metodologi:** Agentic Engineering / The New SDLC
-
----
-
-# 1. Pendahuluan
-
-## 1.1 Tujuan Dokumen
-
-Dokumen Software Requirements Specification (SRS) menjelaskan kebutuhan fungsional, kebutuhan nonfungsional, aturan bisnis, dan kriteria penerimaan sistem WarungAdam.
-
-Dokumen ini menjadi acuan dalam proses perancangan database, antarmuka, arsitektur, implementasi, dan pengujian sistem.
-
-## 1.2 Ruang Lingkup Sistem
-
-WarungAdam merupakan sistem kasir dan manajemen usaha yang mencakup:
-
-1. Kasir dan transaksi.
-2. Produk dan stok.
-3. Supplier dan pembelian.
-4. Retur barang.
-5. Pengeluaran.
-6. Dashboard.
-7. Riwayat transaksi dan pesanan.
-8. Laporan.
-9. Pengaturan sistem.
-10. Hak akses pengguna.
-
-## 1.3 Istilah
-
-| Istilah | Keterangan |
-|---|---|
-| POS | Point of Sale atau sistem kasir |
-| HPP | Harga Pokok Penjualan |
-| SKU | Kode unik produk atau varian |
-| Barcode | Kode identifikasi produk |
-| Supplier | Pihak yang menyediakan barang |
-| Retur | Pengembalian barang |
-| Marketplace | Platform penjualan online |
-| Audit Log | Riwayat aktivitas pengguna |
-| Pengelola | Pengguna yang memiliki akses operasional sistem |
-| Stok | Jumlah barang yang tersedia |
-
-# 2. Gambaran Umum Sistem
-
-## 2.1 Karakteristik Pengguna
-
-Sistem digunakan oleh dua orang pengelola usaha.
-
-Keduanya menggunakan akun terpisah dengan role yang sama, yaitu `PENGELOLA`.
-
-Kedua akun memiliki hak akses setara terhadap seluruh fitur operasional.
-
-Tidak terdapat pembagian hak akses Owner dan Kasir.
-
-## 2.2 Lingkungan Penggunaan
-
-Detail lingkungan implementasi ditentukan pada tahap perancangan teknis.
-
-Sistem direncanakan dapat diakses melalui browser pada perangkat yang disepakati.
-
-Kebutuhan penggunaan offline, jenis perangkat, dan dukungan printer masih perlu dikonfirmasi.
-
-## 2.3 Asumsi Sistem
-
-1. Sistem digunakan untuk satu usaha.
-2. Terdapat dua akun pengelola pada kebutuhan awal.
-3. Penjualan marketplace dicatat secara manual.
-4. Sistem tidak melakukan sinkronisasi otomatis dengan marketplace.
-5. Data transaksi yang dimasukkan pengguna menjadi dasar laporan.
-6. Perubahan data penting harus memiliki riwayat.
-7. Nilai uang disimpan dalam satuan Rupiah dengan tipe numerik yang aman untuk perhitungan.
-
-# 3. Kebutuhan Fungsional
-
-# 3.1 Modul Autentikasi dan Hak Akses
-
-## FR-AUTH-001 — Autentikasi Pengguna
-
-**Requirement:**
-
-Sistem harus menyediakan autentikasi untuk dua akun pengguna yang memiliki peran sama, yaitu `PENGELOLA`.
-
-**Acceptance Criteria:**
-
-1. Sistem menyediakan dua akun pengguna terpisah.
-2. Setiap pengguna dapat login menggunakan kredensial masing-masing.
-3. Setiap pengguna dapat melakukan logout.
-4. Sistem memvalidasi kredensial sebelum memberikan akses.
-5. Password disimpan menggunakan metode hashing yang aman.
-6. Pengguna yang belum login tidak dapat mengakses halaman yang membutuhkan autentikasi.
-
-## FR-AUTH-002 — Hak Akses Setara
-
-**Requirement:**
-
-Kedua akun dengan role `PENGELOLA` harus memiliki hak akses yang setara terhadap seluruh fitur operasional.
-
-**Acceptance Criteria:**
-
-1. Kedua akun menggunakan role `PENGELOLA`.
-2. Kedua akun dapat mengakses dashboard.
-3. Kedua akun dapat melakukan transaksi penjualan.
-4. Kedua akun dapat mengelola produk dan stok.
-5. Kedua akun dapat mengelola supplier dan pembelian.
-6. Kedua akun dapat mencatat retur.
-7. Kedua akun dapat mencatat pengeluaran.
-8. Kedua akun dapat melihat riwayat transaksi dan laporan.
-9. Sistem tidak membedakan hak akses berdasarkan urutan pembuatan akun.
-10. Pemeriksaan otorisasi dilakukan di sisi server.
-
-## FR-AUTH-003 — Identifikasi Aktivitas Pengguna
-
-**Requirement:**
-
-Sistem harus mencatat identitas pengguna yang melakukan aktivitas penting.
-
-**Acceptance Criteria:**
-
-1. Transaksi penjualan menyimpan ID pengguna yang membuatnya.
-2. Transaksi pembelian menyimpan ID pengguna yang membuatnya.
-3. Pencatatan pengeluaran menyimpan ID pengguna yang membuatnya.
-4. Perubahan stok menyimpan ID pengguna yang melakukannya.
-5. Perubahan data penting menyimpan identitas pengguna dan waktu aktivitas.
-6. Riwayat aktivitas dapat ditelusuri oleh kedua pengelola.
-7. Riwayat transaksi tetap menyimpan identitas pelaku meskipun akun dinonaktifkan.
-
-# 3.2 Modul Kasir dan Transaksi
-
-## FR-SALE-001 — Pencatatan Transaksi Penjualan
-
-**Requirement:**
-
-Sistem harus menyediakan fitur untuk mencatat transaksi penjualan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat membuat transaksi baru.
-2. Pengguna dapat memilih produk yang tersedia.
-3. Pengguna dapat memasukkan jumlah produk.
-4. Sistem menghitung subtotal setiap produk.
-5. Sistem menghitung total transaksi.
-6. Sistem menyimpan waktu dan identitas pengguna yang membuat transaksi.
-7. Sistem menghasilkan identitas transaksi yang unik.
-8. Transaksi yang sudah tersimpan dapat dilihat pada riwayat transaksi.
-
-## FR-SALE-002 — Penjualan Offline
-
-**Requirement:**
-
-Sistem harus mendukung pencatatan transaksi penjualan langsung melalui fitur kasir.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat memilih produk dari daftar produk.
-2. Pengguna dapat memasukkan jumlah barang.
-3. Sistem menghitung total transaksi.
-4. Transaksi disimpan dengan kanal penjualan `OFFLINE`.
-5. Sistem dapat menyediakan data transaksi untuk pencetakan nota apabila fitur cetak telah disetujui.
-
-## FR-SALE-003 — Penjualan Online
-
-**Requirement:**
-
-Sistem harus mendukung pencatatan manual transaksi yang berasal dari marketplace.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat memilih kanal penjualan.
-2. Sistem dapat menyimpan nama kanal marketplace.
-3. Pengguna dapat memasukkan nomor transaksi atau nomor resi.
-4. Pengguna dapat memilih produk yang dijual.
-5. Pengguna dapat memasukkan jumlah produk.
-6. Sistem menyimpan informasi transaksi.
-7. Sistem tidak mengambil data pesanan secara otomatis dari marketplace.
-
-**Catatan:** Daftar marketplace harus dapat disesuaikan dengan kanal yang digunakan usaha.
-
-## FR-SALE-004 — Perhitungan Total Transaksi
-
-**Requirement:**
-
-Sistem harus menghitung total transaksi berdasarkan produk dan jumlah yang dimasukkan.
-
-**Acceptance Criteria:**
-
-1. Subtotal produk dihitung dari harga jual dikalikan jumlah barang.
-2. Total transaksi merupakan hasil penjumlahan subtotal produk.
-3. Diskon dan biaya tambahan hanya diterapkan apabila aturan tersebut telah disepakati.
-4. Nilai transaksi lama tidak berubah ketika harga jual produk diperbarui.
-
-## FR-SALE-005 — Pencatatan Bahan Kemasan
-
-**Requirement:**
-
-Sistem harus memungkinkan pengguna memilih bahan kemasan yang digunakan dalam transaksi.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat memilih bahan kemasan yang tersedia.
-2. Pengguna dapat memasukkan jumlah bahan yang digunakan.
-3. Sistem menghitung biaya bahan berdasarkan jumlah pemakaian.
-4. Sistem menambahkan biaya pemakaian bahan kemasan ke dalam perhitungan HPP transaksi.
-5. Sistem mengurangi stok bahan kemasan sesuai jumlah yang digunakan.
-6. Sistem menyimpan riwayat pemakaian bahan kemasan.
-
-## FR-SALE-006 — Status Transaksi
-
-**Requirement:**
-
-Sistem harus menyimpan status transaksi agar proses penjualan dapat ditelusuri.
-
-**Acceptance Criteria:**
-
-1. Sistem menyediakan status transaksi sesuai alur yang disepakati.
-2. Perubahan status transaksi disimpan dalam riwayat.
-3. Pembatalan transaksi tidak menghapus catatan transaksi awal.
-4. Aturan final status transaksi masih perlu dikonfirmasi.
-
-**Status sementara yang diusulkan:** Menunggu, Diproses, Selesai, dan Dibatalkan.
-
-## FR-SALE-007 — Pembatalan dan Perubahan Transaksi
-
-**Requirement:**
-
-Sistem perlu mengatur pembatalan atau perubahan transaksi tanpa menghilangkan riwayat awal.
-
-**Acceptance Criteria:**
-
-1. Transaksi yang dibatalkan tetap memiliki catatan.
-2. Sistem mencatat pengguna yang melakukan pembatalan.
-3. Sistem mencatat waktu dan alasan pembatalan apabila diwajibkan.
-4. Dampak pembatalan terhadap stok dan keuangan mengikuti aturan yang disepakati.
-
-**Status:** Perlu konfirmasi klien.
-
-# 3.3 Modul Produk dan Stok
-
-## FR-PROD-001 — Pengelolaan Produk
-
-**Requirement:**
-
-Sistem harus menyediakan fitur untuk menambah, melihat, mengubah, dan menonaktifkan produk.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat menambahkan produk.
-2. Pengguna dapat mengubah informasi produk.
-3. Pengguna dapat melihat daftar produk.
-4. Pengguna dapat mencari produk.
-5. Produk yang memiliki riwayat transaksi tidak dapat dihapus permanen.
-6. Produk dapat dinonaktifkan tanpa menghilangkan riwayat transaksi.
-
-## FR-PROD-002 — Varian Produk
-
-**Requirement:**
-
-Sistem harus mendukung satu produk yang memiliki beberapa varian atau bentuk kemasan.
-
-**Acceptance Criteria:**
-
-1. Satu produk dapat memiliki beberapa varian.
-2. Setiap varian dapat memiliki informasi identifikasi tersendiri.
-3. Setiap varian dapat memiliki barcode.
-4. Setiap varian dapat memiliki harga jual dan informasi stok.
-5. Riwayat transaksi harus dapat menunjukkan varian yang dijual.
-
-Contoh: Produk minyak dapat memiliki varian 800 ml, 1 liter, 2 liter, dan botol.
-
-**Catatan:** Apakah stok setiap varian berdiri sendiri atau saling terhubung melalui konversi satuan masih perlu ditentukan pada desain teknis.
-
-## FR-PROD-003 — Barcode Produk
-
-**Requirement:**
-
-Sistem harus mendukung input barcode melalui pemindaian maupun input manual.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat memasukkan barcode secara manual.
-2. Pengguna dapat menggunakan perangkat pemindai barcode yang kompatibel.
-3. Barcode digunakan untuk membantu mengidentifikasi produk atau varian.
-4. Sistem memvalidasi agar barcode tidak digunakan secara tidak semestinya pada data produk yang berbeda.
-
-## FR-PROD-004 — Pengelolaan Stok Produk
-
-**Requirement:**
-
-Sistem harus menyimpan jumlah stok setiap produk atau varian sesuai struktur stok yang ditetapkan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat melihat jumlah stok.
-2. Perubahan stok tercatat dalam riwayat.
-3. Pembelian barang yang dikonfirmasi dapat menambah stok.
-4. Penjualan mengurangi stok sesuai aturan waktu pengurangan yang disepakati.
-5. Penyesuaian stok manual dapat dilakukan oleh pengelola.
-6. Penyesuaian stok menyediakan kolom alasan yang bersifat opsional.
-
-## FR-PROD-005 — Notifikasi Stok Rendah
-
-**Requirement:**
-
-Sistem harus memberikan informasi ketika stok produk mencapai batas minimum.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat menentukan batas stok minimum.
-2. Sistem membandingkan stok saat ini dengan batas minimum.
-3. Produk yang mencapai atau berada di bawah batas minimum ditandai.
-4. Pengguna dapat melihat atau mengurutkan produk berdasarkan kondisi stok.
-
-## FR-PROD-006 — Riwayat Harga Beli
-
-**Requirement:**
-
-Sistem harus mencatat perubahan harga beli produk.
-
-**Acceptance Criteria:**
-
-1. Sistem menyimpan harga beli yang tercatat pada pembelian.
-2. Sistem mempertahankan riwayat harga sebelumnya.
-3. Perubahan harga tidak mengubah data pembelian lama.
-4. Data harga beli dapat dihubungkan dengan produk dan supplier terkait.
-
-## FR-PROD-007 — Hubungan Produk dan Supplier
-
-**Requirement:**
-
-Satu produk dapat dihubungkan dengan lebih dari satu supplier.
-
-**Acceptance Criteria:**
-
-1. Produk dapat memiliki beberapa relasi supplier.
-2. Supplier dapat menyediakan lebih dari satu produk.
-3. Sistem menyimpan informasi harga beli berdasarkan riwayat pembelian.
-4. Alamat supplier dapat disimpan secara opsional.
-
-# 3.4 Modul Supplier dan Pembelian
-
-## FR-SUP-001 — Pengelolaan Supplier
-
-**Requirement:**
-
-Sistem harus menyediakan fitur pengelolaan data supplier.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat menambahkan supplier.
-2. Pengguna dapat mengubah data supplier.
-3. Pengguna dapat melihat daftar supplier.
-4. Data supplier dapat dicari.
-5. Alamat supplier bersifat opsional.
-6. Supplier yang memiliki riwayat pembelian tidak dihapus permanen, tetapi dapat dinonaktifkan.
-
-## FR-PUR-001 — Pencatatan Pembelian
-
-**Requirement:**
-
-Sistem harus menyediakan fitur pencatatan transaksi pembelian barang dari supplier.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat membuat transaksi pembelian.
-2. Setiap transaksi pembelian harus memilih supplier yang telah terdaftar.
-3. Satu transaksi dapat berisi beberapa jenis produk.
-4. Pengguna dapat memasukkan jumlah barang.
-5. Pengguna dapat memasukkan harga beli.
-6. Sistem menghitung subtotal dan total pembelian.
-7. Sistem menyimpan tanggal pembelian dan identitas pengguna.
-8. Transaksi pembelian memiliki identitas unik.
-
-## FR-PUR-002 — Hubungan Harga Beli dengan Produk
-
-**Requirement:**
-
-Harga beli yang dimasukkan pada transaksi pembelian harus terhubung dengan data produk.
-
-**Acceptance Criteria:**
-
-1. Setiap item pembelian terhubung dengan produk atau varian terkait.
-2. Harga beli disimpan sebagai bagian dari riwayat pembelian.
-3. Sistem dapat memperbarui informasi harga beli produk berdasarkan transaksi terbaru sesuai aturan yang ditetapkan.
-4. Harga pada transaksi lama tidak berubah.
-5. Sistem mempertahankan riwayat perubahan harga beli.
-
-**Catatan:** Mekanisme final penentuan harga beli terkini dan metode perhitungan HPP perlu diperinci sebelum implementasi.
-
-## FR-PUR-003 — Pembelian Kredit atau Utang
-
-**Requirement:**
-
-Sistem harus mendukung transaksi pembelian yang tidak langsung dibayar lunas.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat mencatat pembelian dengan status belum dibayar.
-2. Sistem menyimpan jumlah tagihan pembelian.
-3. Sistem dapat mencatat jumlah yang sudah dibayar.
-4. Sistem menghitung sisa utang.
-5. Status pembayaran diperbarui sesuai pembayaran yang tercatat.
-
-## FR-PUR-004 — Pembayaran Bertahap
-
-**Requirement:**
-
-Sistem harus mendukung pencatatan pembayaran pembelian secara bertahap.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat mencatat pembayaran pertama.
-2. Pengguna dapat mencatat pembayaran berikutnya.
-3. Setiap pembayaran menyimpan tanggal dan nominal.
-4. Sistem menghitung total pembayaran.
-5. Sistem menghitung sisa tagihan.
-6. Status pembayaran menjadi lunas ketika seluruh tagihan telah dibayar.
-
-## FR-PUR-005 — Pembelian dengan Banyak Produk
-
-**Requirement:**
-
-Satu transaksi pembelian dapat berisi beberapa jenis produk.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat menambahkan lebih dari satu produk ke transaksi pembelian.
-2. Setiap produk memiliki jumlah dan harga beli masing-masing.
-3. Sistem menghitung subtotal setiap produk.
-4. Sistem menghitung total pembelian seluruh produk.
-
-## FR-PUR-006 — Retur kepada Supplier
-
-**Requirement:**
-
-Sistem dapat mencatat pengembalian barang rusak kepada supplier.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat memilih transaksi pembelian asal apabila tersedia.
-2. Pengguna dapat memilih produk yang dikembalikan.
-3. Pengguna dapat memasukkan jumlah barang yang dikembalikan.
-4. Sistem mencatat alasan pengembalian.
-5. Sistem mencatat hasil pengembalian sesuai kesepakatan dengan supplier.
-6. Perubahan stok mengikuti kondisi barang dan hasil pengembalian.
-
-**Catatan:** Mekanisme pengembalian uang atau penggantian barang masih perlu diperinci.
-
-# 3.5 Modul Retur Barang
-
-## FR-RET-001 — Pencatatan Retur Pelanggan
-
-**Requirement:**
-
-Sistem harus menyediakan fitur pencatatan retur barang dari pelanggan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat memilih transaksi penjualan asal.
-2. Pengguna dapat memilih produk yang diretur.
-3. Pengguna dapat memasukkan jumlah barang yang diretur.
-4. Pengguna dapat mencatat tanggal retur.
-5. Pengguna dapat mencatat alasan retur.
-6. Sistem menyimpan identitas pengguna yang mencatat retur.
-7. Sistem mendukung pencatatan retur sebagian.
-
-## FR-RET-002 — Kondisi Barang Retur
-
-**Requirement:**
-
-Sistem harus membedakan kondisi barang yang dikembalikan pelanggan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat menentukan kondisi barang.
-2. Barang yang masih layak jual dapat diproses untuk dikembalikan ke stok.
-3. Barang rusak tidak otomatis menambah stok barang layak jual.
-4. Sistem menyimpan kondisi barang sebagai bagian dari riwayat retur.
-
-## FR-RET-003 — Status Klaim Marketplace
-
-**Requirement:**
-
-Sistem harus menyediakan pencatatan status klaim marketplace untuk retur barang rusak.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat mencatat klaim belum diajukan, sedang diproses, disetujui, atau ditolak.
-2. Sistem menyimpan hasil klaim.
-3. Sistem membedakan klaim yang disetujui dan ditolak.
-4. Status klaim dapat ditelusuri pada riwayat retur.
-
-## FR-RET-004 — Dampak Keuangan Retur
-
-**Requirement:**
-
-Sistem harus mencatat dampak keuangan dari retur sesuai hasil klaim marketplace.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat mencatat nominal pengembalian dana kepada pelanggan.
-2. Klaim yang disetujui dapat dicatat sebagai kondisi ketika penjual tidak mengalami kerugian sesuai penjelasan klien.
-3. Klaim yang ditolak dapat dicatat sebagai kerugian penjual apabila dana dikembalikan kepada pelanggan dan barang diterima dalam kondisi rusak.
-4. Sistem membedakan status klaim dengan status penerimaan dana.
-5. Perhitungan final dampak retur terhadap omzet, HPP, dan keuntungan harus ditetapkan sebelum implementasi.
-
-## FR-RET-005 — Penyesuaian Stok Akibat Retur
-
-**Requirement:**
-
-Sistem harus menyesuaikan stok berdasarkan kondisi barang yang diretur.
-
-**Acceptance Criteria:**
-
-1. Barang layak jual dapat menambah stok kembali.
-2. Barang rusak tidak menambah stok layak jual.
-3. Setiap perubahan stok akibat retur dicatat.
-4. Sistem menyimpan hubungan antara retur dan transaksi asal.
-
-# 3.6 Modul Pengeluaran
-
-## FR-EXP-001 — Pencatatan Pengeluaran
-
-**Requirement:**
-
-Sistem harus menyediakan fitur pencatatan pengeluaran usaha.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat mencatat pengeluaran.
-2. Pengguna dapat memasukkan nominal.
-3. Pengguna dapat memasukkan tanggal.
-4. Pengguna dapat memilih kategori pengeluaran.
-5. Pengguna dapat menambahkan keterangan.
-6. Sistem menyimpan identitas pengguna yang mencatat pengeluaran.
-
-## FR-EXP-002 — Kategori Pengeluaran
-
-**Requirement:**
-
-Sistem harus membedakan pengeluaran teknis dan nonteknis.
-
-**Acceptance Criteria:**
-
-1. Pengeluaran teknis digunakan untuk biaya yang berkaitan dengan bahan kemasan.
-2. Pengeluaran nonteknis digunakan untuk biaya operasional.
-3. Sistem menyimpan kategori pengeluaran.
-4. Pengeluaran nonteknis tidak otomatis dimasukkan ke dalam HPP bahan kemasan.
-
-## FR-PACK-001 — Pencatatan Pembelian Bahan Kemasan
-
-**Requirement:**
-
-Sistem harus menyediakan pencatatan pembelian bahan kemasan sebagai persediaan tersendiri.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat mencatat nama bahan kemasan.
-2. Pengguna dapat memasukkan jumlah pembelian.
-3. Pengguna dapat menentukan satuan bahan.
-4. Pengguna dapat memasukkan harga pembelian.
-5. Sistem menghitung total harga pembelian.
-6. Pembelian menambah stok bahan kemasan.
-7. Sistem menyimpan riwayat pembelian bahan kemasan.
-
-Contoh bahan kemasan:
-- Kardus.
-- Lakban atau plester.
-- Bubble wrap.
-- Plastik.
-- Kertas struk.
-
-## FR-PACK-002 — Pengelolaan Stok Bahan Kemasan
-
-**Requirement:**
-
-Sistem harus mengelola jumlah persediaan bahan kemasan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat melihat stok bahan kemasan.
-2. Sistem menyimpan satuan setiap bahan.
-3. Sistem mencatat penambahan stok dari pembelian.
-4. Sistem mencatat pengurangan stok dari pemakaian.
-5. Sistem menyimpan riwayat pergerakan stok.
-6. Sistem dapat menghitung sisa stok berdasarkan transaksi masuk dan pemakaian.
-
-## FR-PACK-003 — Pemakaian Bahan Kemasan
-
-**Requirement:**
-
-Sistem harus mencatat pemakaian bahan kemasan pada transaksi penjualan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat memilih bahan kemasan yang digunakan.
-2. Pengguna dapat memasukkan jumlah bahan yang digunakan.
-3. Sistem mengurangi stok bahan kemasan sesuai jumlah pemakaian.
-4. Sistem menyimpan hubungan pemakaian bahan dengan transaksi penjualan.
-5. Sistem menyimpan riwayat penggunaan bahan kemasan.
-
-## FR-PACK-004 — Perhitungan Biaya Bahan Kemasan
-
-**Requirement:**
-
-Sistem harus menghitung biaya pemakaian bahan kemasan berdasarkan harga dan jumlah pemakaian.
-
-**Acceptance Criteria:**
-
-1. Sistem menghitung biaya per satuan bahan.
-2. Sistem menghitung biaya berdasarkan jumlah bahan yang digunakan.
-3. Sistem menjumlahkan biaya seluruh bahan kemasan pada transaksi.
-4. Total biaya kemasan dimasukkan ke dalam perhitungan HPP transaksi.
-5. Perubahan harga pembelian bahan tidak mengubah biaya historis transaksi yang sudah tersimpan.
-
-**Catatan:** Metode penentuan biaya per satuan, termasuk penanganan bahan yang dibeli dalam satuan roll tetapi digunakan dalam meter, perlu ditetapkan pada desain teknis.
-
-## FR-EXP-003 — Pengeluaran Nonteknis
-
-**Requirement:**
-
-Sistem harus menyediakan pencatatan pengeluaran operasional yang tidak termasuk biaya bahan kemasan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat mencatat pengeluaran seperti parkir, transportasi, dan listrik.
-2. Pengguna dapat menentukan kategori.
-3. Sistem menyimpan nominal dan tanggal.
-4. Pengeluaran dicatat sebagai biaya operasional.
-5. Pengeluaran tidak dimasukkan ke dalam stok bahan kemasan.
-
-# 3.7 Modul Dashboard
-
-## FR-DASH-001 — Dashboard Ringkasan
-
-**Requirement:**
-
-Sistem harus menampilkan ringkasan kondisi usaha pada halaman dashboard.
-
-**Acceptance Criteria:**
-
-1. Menampilkan total penjualan berdasarkan periode.
-2. Menampilkan total pembelian berdasarkan periode.
-3. Menampilkan total pengeluaran.
-4. Menampilkan ringkasan keuntungan berdasarkan perhitungan yang disepakati.
-5. Menampilkan informasi stok produk.
-6. Menampilkan informasi stok bahan kemasan.
-7. Menampilkan transaksi terbaru.
-8. Pengguna dapat memilih periode tampilan.
-
-## FR-DASH-002 — Informasi Stok Rendah
-
-**Requirement:**
-
-Dashboard harus menampilkan informasi produk atau bahan kemasan yang mencapai batas stok minimum.
-
-**Acceptance Criteria:**
-
-1. Sistem menampilkan daftar stok rendah.
-2. Informasi stok diperbarui berdasarkan data stok terbaru.
-3. Pengguna dapat membuka detail produk atau bahan terkait.
-
-# 3.8 Modul Riwayat Transaksi dan Pesanan
-
-## FR-HIST-001 — Riwayat Penjualan
-
-**Requirement:**
-
-Sistem harus menyediakan daftar seluruh transaksi penjualan yang tersimpan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat melihat daftar transaksi.
-2. Pengguna dapat membuka detail transaksi.
-3. Pengguna dapat mencari transaksi.
-4. Pengguna dapat memfilter transaksi berdasarkan tanggal.
-5. Setiap transaksi menampilkan identitas pengguna yang membuatnya.
-
-## FR-HIST-002 — Riwayat Pembelian
-
-**Requirement:**
-
-Sistem harus menyediakan riwayat pembelian barang dari supplier.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat melihat daftar pembelian.
-2. Pengguna dapat melihat detail produk pada pembelian.
-3. Pengguna dapat melihat total pembelian.
-4. Pengguna dapat melihat status pembayaran.
-5. Pengguna dapat melihat riwayat pembayaran bertahap.
-
-## FR-HIST-003 — Riwayat Retur
-
-**Requirement:**
-
-Sistem harus menyediakan riwayat retur barang.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat melihat daftar retur.
-2. Pengguna dapat membuka detail retur.
-3. Pengguna dapat melihat kondisi barang.
-4. Pengguna dapat melihat status klaim marketplace.
-5. Pengguna dapat melihat dampak retur terhadap stok dan keuangan sesuai data yang dicatat.
-
-## FR-HIST-004 — Riwayat Pengeluaran dan Stok Kemasan
-
-**Requirement:**
-
-Sistem harus menyediakan riwayat pengeluaran dan penggunaan bahan kemasan.
-
-**Acceptance Criteria:**
-
-1. Pengguna dapat melihat daftar pengeluaran.
-2. Pengguna dapat melihat riwayat pembelian bahan kemasan.
-3. Pengguna dapat melihat riwayat penggunaan bahan kemasan.
-4. Pengguna dapat menelusuri penggunaan bahan berdasarkan transaksi penjualan.
-
-# 3.9 Modul Laporan
-
-## FR-REPORT-001 — Laporan Penjualan
-
-Sistem menyediakan laporan penjualan berdasarkan periode.
-
-**Acceptance Criteria:**
-
-1. Menampilkan total penjualan.
-2. Menampilkan jumlah transaksi.
-3. Menampilkan produk yang terjual.
-4. Menyediakan filter periode.
-5. Menampilkan data sesuai transaksi yang tersimpan.
-
-## FR-REPORT-002 — Laporan Pembelian
-
-Sistem menyediakan laporan pembelian barang dari supplier.
-
-**Acceptance Criteria:**
-
-1. Menampilkan total pembelian.
-2. Menampilkan rincian pembelian.
-3. Menampilkan supplier.
-4. Menampilkan status pembayaran.
-5. Menyediakan filter periode.
-
-## FR-REPORT-003 — Laporan Pengeluaran
-
-Sistem menyediakan laporan pengeluaran usaha.
-
-**Acceptance Criteria:**
-
-1. Menampilkan total pengeluaran.
-2. Menampilkan kategori pengeluaran.
-3. Memisahkan pengeluaran teknis dan nonteknis.
-4. Menyediakan filter periode.
-
-## FR-REPORT-004 — Laporan Keuntungan
-
-Sistem menyediakan laporan keuntungan berdasarkan transaksi penjualan dan biaya terkait.
-
-**Acceptance Criteria:**
-
-1. Perhitungan memperhitungkan nilai penjualan.
-2. Perhitungan memperhitungkan HPP barang.
-3. Perhitungan memperhitungkan biaya bahan kemasan.
-4. Perhitungan memperhitungkan dampak retur sesuai aturan yang disepakati.
-5. Pengeluaran operasional ditampilkan secara terpisah dan diperhitungkan dalam keuntungan bersih sesuai metode yang ditetapkan.
-6. Metode perhitungan final harus terdokumentasi.
-
-## FR-REPORT-005 — Laporan Stok
-
-Sistem menyediakan laporan jumlah stok produk.
-
-**Acceptance Criteria:**
-
-1. Menampilkan stok produk atau varian.
-2. Menampilkan stok rendah.
-3. Menampilkan riwayat pergerakan stok.
-4. Menyediakan filter produk atau periode.
-
-## FR-REPORT-006 — Laporan Bahan Kemasan
-
-Sistem menyediakan laporan pembelian dan pemakaian bahan kemasan.
-
-**Acceptance Criteria:**
-
-1. Menampilkan jumlah bahan yang dibeli.
-2. Menampilkan jumlah bahan yang digunakan.
-3. Menampilkan sisa stok.
-4. Menampilkan biaya penggunaan bahan.
-5. Menyediakan filter periode.
-
-# 3.10 Modul Pengaturan Sistem
-
-## FR-SET-001 — Pengaturan Informasi Usaha
-
-Sistem menyediakan pengaturan informasi usaha yang dibutuhkan untuk identitas aplikasi dan nota apabila fitur nota digunakan.
-
-## FR-SET-002 — Pengaturan Kategori dan Satuan
-
-Sistem menyediakan pengaturan kategori produk, kategori pengeluaran, serta satuan yang diperlukan untuk pencatatan.
-
-## FR-SET-003 — Pengaturan Batas Stok
-
-Sistem memungkinkan pengelola menentukan batas stok minimum produk dan bahan kemasan.
-
-Detail pengaturan lainnya ditetapkan berdasarkan kebutuhan operasional yang telah disepakati.
-
-# 4. Kebutuhan Nonfungsional
-
-## NFR-001 — Keamanan
-
-1. Sistem harus menggunakan autentikasi.
-2. Password tidak disimpan dalam bentuk teks biasa.
-3. Akses ke fitur harus divalidasi di sisi server.
-4. Sistem harus mencegah pengguna yang belum login mengakses data operasional.
-
-## NFR-002 — Integritas Data
-
-1. Data transaksi harus tersimpan secara konsisten.
-2. Perubahan stok harus sesuai dengan transaksi yang memengaruhinya.
-3. Operasi yang saling berkaitan harus diproses secara konsisten.
-4. Sistem harus mencegah pencatatan transaksi ganda akibat pengiriman permintaan yang sama.
-
-## NFR-003 — Kemudahan Penggunaan
-
-1. Antarmuka harus mudah dipahami.
-2. Formulir input harus memiliki label yang jelas.
-3. Sistem menampilkan pesan kesalahan yang dapat dipahami pengguna.
-4. Proses pencatatan transaksi dibuat sesederhana mungkin.
-
-## NFR-004 — Kinerja
-
-1. Sistem harus mampu menangani aktivitas operasional harian.
-2. Pencarian dan filter data harus memberikan hasil dalam waktu yang wajar.
-3. Pengambilan laporan harus menggunakan metode yang sesuai dengan volume data.
-
-## NFR-005 — Keterlacakan
-
-1. Aktivitas penting harus menyimpan identitas pengguna.
-2. Aktivitas penting harus menyimpan waktu kejadian.
-3. Perubahan data yang memengaruhi transaksi atau stok harus dapat ditelusuri.
-
-## NFR-006 — Kompatibilitas
-
-Sistem harus dapat digunakan melalui browser dan perangkat yang telah ditentukan pada tahap implementasi.
-
-## NFR-007 — Pemeliharaan
-
-Struktur sistem harus memungkinkan pengembangan fitur dan perbaikan tanpa mengganggu keseluruhan sistem.
-
-## NFR-008 — Keandalan Data
-
-Data transaksi yang telah tersimpan harus tetap tersedia dan tidak berubah hanya karena data produk atau supplier diperbarui.
-
-# 5. Aturan Bisnis
-
-## BR-001 — Identitas Pengguna
-
-Setiap aktivitas penting harus menyimpan identitas akun yang melakukan aktivitas tersebut.
-
-## BR-002 — Hak Akses
-
-Kedua akun menggunakan role `PENGELOLA` dan memiliki hak akses yang setara.
-
-## BR-003 — Harga Historis
-
-Perubahan harga produk tidak boleh mengubah harga yang sudah tercatat pada transaksi sebelumnya.
-
-## BR-004 — Riwayat Produk
-
-Produk yang memiliki riwayat transaksi tidak boleh dihapus permanen.
-
-## BR-005 — Riwayat Supplier
-
-Supplier yang memiliki riwayat pembelian tidak boleh dihapus permanen.
-
-## BR-006 — Perubahan Stok
-
-Setiap perubahan stok harus memiliki catatan pergerakan stok.
-
-## BR-007 — Pembelian Barang
-
-Pembelian yang dikonfirmasi menambah stok produk sesuai jumlah barang yang diterima dan aturan pencatatan yang ditetapkan.
-
-## BR-008 — Pembayaran Pembelian
-
-Pembayaran pembelian secara bertahap harus tercatat secara terpisah agar total pembayaran dan sisa utang dapat dihitung.
-
-## BR-009 — Bahan Kemasan
-
-Pembelian bahan kemasan menambah stok bahan kemasan.
-
-Pemakaian bahan kemasan mengurangi stok dan menghasilkan biaya yang masuk ke perhitungan HPP transaksi.
-
-## BR-010 — Pengeluaran Operasional
-
-Pengeluaran nonteknis dicatat sebagai biaya operasional dan tidak dimasukkan ke dalam stok bahan kemasan.
-
-## BR-011 — Retur Barang
-
-Retur harus memiliki hubungan dengan transaksi asal apabila data transaksi asal tersedia.
-
-## BR-012 — Kondisi Barang Retur
-
-Barang rusak tidak otomatis dikembalikan ke stok barang layak jual.
-
-## BR-013 — Klaim Marketplace
-
-Status klaim marketplace harus dibedakan dari status penerimaan dana.
-
-## BR-014 — Data Transaksi
-
-Transaksi yang sudah tersimpan tidak boleh dihapus tanpa mekanisme koreksi atau pembatalan yang meninggalkan riwayat.
-
-# 6. Rancangan Awal Kelompok Data
-
-Bagian ini merupakan gambaran awal entitas database. Struktur tabel dan relasi final akan ditetapkan pada tahap ERD.
-
-| Entitas | Fungsi |
-|---|---|
-| Users | Menyimpan dua akun pengelola |
-| Products | Menyimpan data produk utama |
-| ProductVariants | Menyimpan varian produk |
-| Categories | Menyimpan kategori produk |
-| Suppliers | Menyimpan data supplier |
-| ProductSuppliers | Menghubungkan produk dengan supplier |
-| Sales | Menyimpan transaksi penjualan |
-| SaleItems | Menyimpan detail produk yang dijual |
-| SalesChannels | Menyimpan kanal penjualan |
-| Purchases | Menyimpan transaksi pembelian |
-| PurchaseItems | Menyimpan detail pembelian |
-| PurchasePayments | Menyimpan pembayaran pembelian |
-| StockMovements | Menyimpan perubahan stok produk |
-| Returns | Menyimpan data retur |
-| ReturnItems | Menyimpan detail barang retur |
-| PackagingMaterials | Menyimpan data bahan kemasan |
-| PackagingPurchases | Menyimpan pembelian bahan kemasan |
-| PackagingUsages | Menyimpan pemakaian bahan kemasan |
-| Expenses | Menyimpan pengeluaran usaha |
-| ActivityLogs | Menyimpan riwayat aktivitas pengguna |
-
-Entitas di atas masih berupa rancangan awal. Entitas tambahan atau perubahan relasi dapat dilakukan setelah aturan bisnis dan ERD ditinjau.
-
-# 7. Kebutuhan yang Masih Perlu Dipastikan
-
-| No. | Bagian | Hal yang Perlu Dipastikan |
-|---|---|---|
-| 1 | Transaksi | Aturan diskon dan biaya tambahan |
-| 2 | Transaksi | Pembatalan dan perubahan transaksi |
-| 3 | Stok | Waktu pengurangan stok saat penjualan |
-| 4 | Varian | Hubungan stok antarvarian dan konversi satuan |
-| 5 | Pembelian | Mekanisme pembaruan harga beli produk |
-| 6 | Pembelian | Penanganan barang yang belum diterima seluruhnya |
-| 7 | Retur | Detail pencatatan klaim marketplace dan dana |
-| 8 | Retur | Perlakuan HPP dan keuntungan untuk setiap hasil retur |
-| 9 | Kemasan | Satuan pembelian dan satuan pemakaian bahan |
-| 10 | HPP | Metode perhitungan biaya barang |
-| 11 | Laporan | Rumus final keuntungan dan laba bersih |
-| 12 | Pengaturan | Detail pengaturan yang dibutuhkan |
-| 13 | Sistem | Kebutuhan penggunaan offline |
-| 14 | Akun | Mekanisme pembuatan awal dan pemulihan akun |
-| 15 | Nota | Kebutuhan cetak nota dan perangkat printer |
-| 16 | Laporan | Kebutuhan ekspor laporan |
-
-# 8. Kriteria Penerimaan Sistem
-
-Sistem dapat dinyatakan memenuhi kebutuhan awal apabila:
-
-1. Dua pengelola dapat login menggunakan akun masing-masing.
-2. Kedua akun memiliki hak akses yang sama.
-3. Sistem dapat mencatat transaksi penjualan.
-4. Sistem dapat mengelola produk dan varian.
-5. Sistem dapat mencatat perubahan stok.
-6. Sistem dapat mengelola supplier.
-7. Sistem dapat mencatat pembelian dan pembayaran bertahap.
-8. Sistem dapat mencatat retur barang.
-9. Sistem dapat mencatat pembelian dan pemakaian bahan kemasan.
-10. Sistem dapat menghitung biaya kemasan ke dalam HPP.
-11. Sistem dapat mencatat pengeluaran operasional.
-12. Sistem dapat menampilkan dashboard dan laporan.
-13. Sistem menyimpan riwayat transaksi dan aktivitas pengguna.
-14. Sistem dapat menjaga konsistensi data transaksi, stok, dan perhitungan.
-
-# 9. Batasan Implementasi
-
-1. Sistem tidak melakukan integrasi otomatis dengan marketplace pada ruang lingkup awal.
-2. Pencatatan transaksi marketplace dilakukan secara manual.
-3. Sistem tidak menyediakan pengelolaan banyak cabang pada ruang lingkup awal.
-4. Sistem tidak menyediakan akuntansi lengkap.
-5. Detail teknis teknologi, arsitektur, dan database ditetapkan setelah kebutuhan fungsional ditinjau.
-6. Fitur yang belum dikonfirmasi tidak boleh dianggap sebagai keputusan final.
-
-# 10. Riwayat Perubahan Dokumen
+# SRS BizManage v0.4
+
+SRS v0.4 mengacu pada BRD v0.5. Requirement yang bergantung pada TBD memakai asumsi sementara dari BRD bagian 8 dan ditandai Blocked pada kolom TBD sampai klien mengonfirmasi.
+
+## 1. Pendahuluan
+
+| Informasi | Keterangan |
+| --- | --- |
+| Nama sistem | BizManage, Sistem Kasir dan Manajemen Usaha |
+| Versi dokumen | 0.4, Draft Revision |
+| Dokumen acuan | BRD v0.5 |
+| Status | Draft, menunggu review dan konfirmasi klien |
+
+SRS ini menjadi dasar perancangan database, antarmuka, implementasi, dan pengujian. Sebelas modul sama dengan BRD v0.5: autentikasi dan pengguna, kasir dan transaksi, produk dan stok, supplier dan pembelian, retur, pengeluaran operasional, persediaan bahan kemasan, dashboard, riwayat, laporan, dan pengaturan.
+
+### Cara membaca tabel requirement
+
+Kolom **BR** menunjuk kebutuhan bisnis di BRD. Kolom **TBD** menunjuk keputusan klien yang belum final; requirement dengan TBD memakai asumsi sementara dari BRD bagian 8 dan kriteria pengujiannya berstatus *Blocked* sampai TBD dikonfirmasi.
+
+### Istilah
+
+| Istilah | Pengertian |
+| --- | --- |
+| HPP | Harga Pokok Penjualan: biaya yang melekat pada barang dan kemasan yang terjual |
+| Varian | Bentuk atau ukuran suatu produk yang punya barcode, harga, dan stok sendiri |
+| Snapshot HPP | Harga jual dan HPP yang disimpan pada saat transaksi terjadi |
+| Penerimaan barang | Pencatatan barang yang benar-benar diterima dari supplier |
+| Stok rusak | Stok barang tidak layak jual yang tidak ikut dijual |
+| Void | Pembatalan transaksi atau pembayaran dengan menyimpan catatan awal |
+| PENGELOLA | Peran pengguna dengan hak akses operasional setara |
+
+## 2. Deskripsi Umum
+
+Sistem adalah aplikasi web untuk satu usaha. Penjualan marketplace dicatat manual; tidak ada integrasi API.
+
+| Pengguna | Role | Hak akses |
+| --- | --- | --- |
+| Pengelola 1 | `PENGELOLA` | Semua fitur operasional |
+| Pengelola 2 | `PENGELOLA` | Semua fitur operasional, setara dengan Pengelola 1 |
+
+### Asumsi teknis
+
+1. Basis data relasional dengan transaksi atomik untuk operasi yang saling terkait.
+2. Nilai uang disimpan dalam Rupiah bilangan bulat.
+3. Kuantitas dan biaya per satuan memakai desimal 4 digit; biaya yang disimpan ke transaksi dibulatkan ke Rupiah terdekat per baris (TBD-16).
+4. Setiap transaksi punya nomor unik dan setiap aktivitas penting menyimpan pengguna dan waktu.
+5. Data historis tidak berubah ketika harga atau data master diperbarui.
+6. Teknologi implementasi ditentukan pada tahap arsitektur.
+
+## 3. Kebutuhan Fungsional
+
+### 3.1 Modul Autentikasi dan Pengguna
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-AUTH-001 | Sistem menyediakan login dengan identitas akun dan password. | Kredensial benar masuk ke dashboard; kredensial salah ditolak dengan pesan tanpa menyebut bagian mana yang salah; halaman internal tidak dapat dibuka tanpa login. | BR-013 |  |
+| FR-AUTH-002 | Sistem mendukung dua akun awal dengan role `PENGELOLA` dan hak akses setara. | Kedua akun dapat login terpisah; kedua akun dapat membuka dan mengubah semua modul operasional; hak akses tidak dibedakan berdasarkan urutan pembuatan akun. | BR-013 |  |
+| FR-AUTH-003 | Pengguna dapat mengganti password sendiri; pengelola lain dapat mereset password akun rekannya. | Ganti password meminta password lama; reset menghasilkan password sementara yang wajib diganti saat login berikutnya; password baru disimpan sebagai hash; kejadian tercatat di riwayat aktivitas. | BR-013 | TBD-19 |
+| FR-AUTH-004 | Sistem dapat menonaktifkan dan mengaktifkan kembali akun. | Akun nonaktif tidak dapat login; riwayat transaksi tetap menyimpan nama pelaku; sistem menolak menonaktifkan akun terakhir yang aktif. | BR-013, BR-015 | TBD-19 |
+| FR-AUTH-005 | Sistem menyediakan logout dan mengakhiri sesi yang tidak aktif. | Setelah logout, tombol kembali tidak menampilkan data internal; sesi berakhir setelah 30 menit tanpa aktivitas (angka dapat diubah). | BR-013 |  |
+| FR-AUTH-006 | Sistem menyimpan pengguna dan waktu pada aktivitas penting. | Penjualan, pembelian, pembayaran, retur, pengeluaran, penyesuaian stok, pembatalan, dan perubahan akun menyimpan ID pengguna dan waktu; data pelaku tetap ada setelah akun dinonaktifkan. | BR-014 |  |
+| FR-AUTH-007 | Otorisasi diperiksa di sisi server pada setiap permintaan. | Permintaan tanpa sesi sah ditolak walaupun diketik langsung ke alamat internal; akses data tanpa login mengembalikan respons tidak berwenang. | BR-013 |  |
+
+### 3.2 Modul Kasir dan Transaksi
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-SALE-001 | Sistem mencatat penjualan offline. | Transaksi menyimpan nomor unik, tanggal dan waktu, pengguna, daftar varian, jumlah, harga jual, diskon, total, metode pembayaran, dan status; transaksi tersimpan muncul di riwayat penjualan. | BR-001, BR-002 | TBD-14 |
+| FR-SALE-002 | Sistem mencari produk lewat pencarian teks dan barcode di kasir. | Pencarian nama atau kode menampilkan varian yang cocok; scan barcode menambahkan varian ke transaksi; barcode tidak terdaftar menampilkan "produk tidak ditemukan"; varian nonaktif tidak dapat dipilih. | BR-005 | TBD-24 |
+| FR-SALE-003 | Sistem mencatat kanal penjualan pada setiap transaksi. | Kanal dipilih dari daftar di pengaturan (offline dan marketplace); kanal tersimpan di transaksi dan dapat dipakai sebagai filter. | BR-001 | TBD-20 |
+| FR-SALE-004 | Sistem mencatat penjualan marketplace secara manual. | Pengguna mengisi kanal, nomor transaksi atau resi, tanggal, item, jumlah, harga jual, dan biaya terkait; sistem tidak mengambil data otomatis; nomor resi yang sama pada kanal yang sama diberi peringatan duplikat. | BR-001 |  |
+| FR-SALE-005 | Sistem menghitung total transaksi. | Subtotal item = harga jual × jumlah; total = jumlah subtotal − diskon + biaya tambahan dari pelanggan; hasil sesuai hitungan manual pada contoh uji. | BR-002 | TBD-13 |
+| FR-SALE-006 | Sistem mendukung diskon per item dan per transaksi serta biaya tambahan dari pelanggan. | Diskon berupa nominal; diskon tidak membuat total negatif; biaya tambahan tersimpan terpisah dari subtotal. | BR-002 | TBD-13 |
+| FR-SALE-007 | Sistem mencatat biaya marketplace per pesanan marketplace. | Pengguna dapat mengisi komisi, biaya layanan, dan ongkir ditanggung penjual; biaya tersimpan terpisah dari HPP dan muncul di laporan keuntungan. | BR-019 | TBD-04 |
+| FR-SALE-008 | Sistem menyimpan tiga kelompok status: pesanan, pembayaran, dan pencairan dana. | Status pesanan: diproses, selesai, dibatalkan. Status pembayaran: belum dibayar, dibayar, dikembalikan. Status pencairan (marketplace): belum cair, sebagian cair, sudah cair, tidak dicairkan. Setiap perubahan menyimpan waktu dan pengguna. | BR-002 | TBD-14 |
+| FR-SALE-009 | Sistem mencatat jumlah dan tanggal dana marketplace yang cair. | Pencairan dapat dicatat bertahap; total cair tidak melebihi nilai yang berhak diterima kecuali ada catatan; status pencairan mengikuti total cair. | BR-019, BR-020 | TBD-14 |
+| FR-SALE-010 | Sistem membatalkan transaksi tanpa menghapusnya. | Pembatalan wajib alasan; transaksi tetap terlihat berstatus dibatalkan; stok produk kembali; pemakaian kemasan tidak dikembalikan kecuali pengguna memilih; pelaku dan waktu tercatat. | BR-002, BR-015 | TBD-11 |
+| FR-SALE-011 | Sistem mengurangi stok produk saat penjualan. | Offline: stok berkurang saat transaksi disimpan. Marketplace: stok berkurang saat pesanan dicatat. Penjualan ditolak jika stok varian tidak mencukupi. | BR-016 | TBD-09, TBD-10 |
+| FR-SALE-012 | Sistem menyimpan snapshot harga jual dan HPP setiap item. | Perubahan harga atau harga beli setelah transaksi tidak mengubah nilai transaksi lama; laporan periode lama menghasilkan angka yang sama sebelum dan sesudah perubahan harga. | BR-003 | TBD-03 |
+| FR-SALE-013 | Sistem mendukung harga jual per kanal. | Varian punya harga default dan dapat punya harga khusus per kanal; harga terisi otomatis sesuai kanal dan dapat diubah pada transaksi. | BR-001 | TBD-05 |
+| FR-SALE-014 | Sistem mencatat pemakaian bahan kemasan pada transaksi. | Pengguna memilih bahan dan jumlah pakai; biaya per baris dihitung dan masuk HPP transaksi; stok kemasan berkurang; rincian terlihat di detail transaksi (lihat FR-PACK-003). | BR-011 | TBD-16 |
+| FR-SALE-015 | Sistem dapat mencetak nota transaksi. | Nota menampilkan identitas usaha, nomor, tanggal, item, dan total; pencetakan lewat fitur cetak browser. | BR-002 | TBD-24 |
+
+### 3.3 Modul Produk dan Stok
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-PROD-001 | Sistem mengelola produk: tambah, ubah, lihat, cari, dan nonaktifkan. | Produk baru muncul di daftar dan pencarian; perubahan tersimpan; produk nonaktif tidak muncul di kasir tetapi tetap muncul di riwayat. | BR-004 |  |
+| FR-PROD-002 | Sistem mengelompokkan produk dalam kategori. | Pengguna dapat memilih kategori saat membuat produk dan memfilter daftar berdasarkan kategori. | BR-004 | TBD-21 |
+| FR-PROD-003 | Satu produk dapat memiliki beberapa varian. | Setiap varian punya nama, satuan, barcode, harga jual, harga beli terakhir, HPP, dan stok sendiri; transaksi menyimpan varian yang dijual. | BR-004 | TBD-01, TBD-02 |
+| FR-PROD-004 | Sistem menerima barcode lewat pemindaian atau ketik manual. | Barcode tersimpan pada varian; barcode yang sudah dipakai varian lain ditolak dengan pesan menyebut varian tersebut; satu varian boleh tanpa barcode. | BR-005 | TBD-24 |
+| FR-PROD-005 | Sistem mencatat riwayat harga beli per varian. | Setiap penerimaan atau pembelian baru menambah satu baris riwayat berisi tanggal, supplier, dan harga; baris lama tidak berubah. | BR-003, BR-007 |  |
+| FR-PROD-006 | Sistem menghitung HPP varian dengan rata-rata tertimbang bergerak. | Setelah penerimaan: HPP baru = (stok lama × HPP lama + qty masuk × harga beli) ÷ (stok lama + qty masuk); contoh uji menghasilkan angka yang sama dengan hitungan manual. | BR-011 | TBD-03 |
+| FR-PROD-007 | Satu varian dapat dihubungkan dengan lebih dari satu supplier. | Varian dapat memiliki beberapa supplier; satu supplier dapat menyediakan banyak varian; harga beli terakhir per supplier terlihat. | BR-006 | TBD-25 |
+| FR-PROD-008 | Sistem menampilkan stok dan mencatat setiap perubahannya. | Setiap perubahan stok membuat satu catatan berisi varian, jumlah, jenis (penerimaan, penjualan, retur, penyesuaian, pembatalan), referensi dokumen, pengguna, dan waktu; saldo stok sama dengan jumlah catatan. | BR-016 |  |
+| FR-PROD-009 | Sistem menyediakan penyesuaian stok manual. | Pengguna mengisi jumlah baru atau selisih; alasan opsional; stok tidak dapat menjadi negatif; pelaku dan waktu tercatat. | BR-016 | TBD-09 |
+| FR-PROD-010 | Sistem memberi peringatan stok rendah. | Varian dengan stok di bawah atau sama dengan batas minimum diberi penanda; daftar produk dapat diurutkan dan disaring menurut kondisi stok; batas kosong berarti tanpa peringatan. | BR-016 | TBD-22 |
+| FR-PROD-011 | Sistem melindungi produk yang punya riwayat dari penghapusan permanen. | Produk atau varian yang sudah dipakai transaksi hanya dapat dinonaktifkan; upaya hapus ditolak dengan pesan; produk tanpa riwayat boleh dihapus. | BR-015 |  |
+
+### 3.4 Modul Supplier dan Pembelian Barang
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-SUP-001 | Sistem mengelola supplier: tambah, ubah, lihat, cari, dan nonaktifkan. | Data supplier berisi nama, telepon, alamat (opsional), dan catatan; supplier yang punya riwayat pembelian hanya dapat dinonaktifkan; supplier nonaktif tidak muncul di pembelian baru tetapi tetap muncul di riwayat. | BR-006, BR-015 |  |
+| FR-PUR-001 | Sistem mencatat pembelian dari supplier terdaftar dengan banyak barang. | Pembelian menyimpan nomor unik, supplier, tanggal, daftar varian, jumlah, harga beli, subtotal, total, catatan, dan pengguna; satu pembelian dapat berisi lebih dari satu varian. | BR-007 |  |
+| FR-PUR-002 | Sistem menyimpan status pembelian. | Status: draf, dikonfirmasi, diterima sebagian, diterima seluruhnya, dibatalkan. Draf menjadi dikonfirmasi; dikonfirmasi menjadi diterima sebagian atau seluruhnya sesuai penerimaan; pembatalan hanya sebelum ada penerimaan; perubahan status tercatat. | BR-007 | TBD-08 |
+| FR-PUR-003 | Sistem mencatat penerimaan barang. | Penerimaan memilih pembelian, varian, dan jumlah diterima; jumlah tidak melebihi sisa pesanan; stok dan HPP bertambah hanya sebesar jumlah diterima; penerimaan sebagian dapat dilanjutkan di kemudian hari. | BR-007 | TBD-08 |
+| FR-PUR-004 | Sistem mendukung pembelian tunai dan tempo. | Pembelian tunai langsung lunas; pembelian tempo menyimpan total tagihan, total dibayar, sisa tagihan, dan status pembayaran (belum dibayar, sebagian, lunas). | BR-008 |  |
+| FR-PUR-005 | Sistem menyimpan tanggal jatuh tempo pembelian tempo. | Tanggal jatuh tempo opsional; tagihan dengan sisa lebih dari nol dan lewat jatuh tempo ditandai terlambat dan tampil di dashboard. | BR-020 | TBD-17 |
+| FR-PUR-006 | Sistem mencatat pembayaran bertahap kepada supplier. | Setiap pembayaran menyimpan tanggal, nominal, metode, dan pengguna; total bayar dan sisa tagihan terhitung ulang; pembayaran melebihi sisa tagihan ditolak; lunas saat sisa nol. | BR-008 |  |
+| FR-PUR-007 | Sistem mengoreksi pembayaran supplier lewat void. | Pembayaran yang salah di-void dengan alasan; catatan awal tetap terlihat; sisa tagihan terhitung ulang; pembayaran pengganti dapat dicatat. | BR-015 | TBD-12 |
+| FR-PUR-008 | Sistem mengoreksi atau membatalkan pembelian dengan riwayat. | Pembelian yang belum diterima dapat dibatalkan dengan alasan; pembelian yang sudah diterima dikoreksi lewat retur atau penyesuaian stok, bukan diubah langsung. | BR-015 | TBD-12 |
+| FR-PUR-009 | Sistem mencatat retur barang kepada supplier. | Retur memilih pembelian asal, varian, jumlah, alasan, dan tanggal; hasil retur: pengembalian uang, barang pengganti, atau potongan tagihan; stok berkurang sesuai jumlah retur. | BR-009 | TBD-18 |
+| FR-PUR-010 | Sistem menampilkan riwayat pembelian. | Daftar dapat disaring menurut supplier, tanggal, status pembelian, dan status pembayaran; detail menampilkan item, penerimaan, dan pembayaran. | BR-007, BR-008 |  |
+
+### 3.5 Modul Retur Barang
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-RET-001 | Sistem mencatat retur pelanggan yang terhubung ke transaksi penjualan asal. | Retur memilih transaksi asal, varian, jumlah, tanggal, dan alasan; pelaku dan waktu tersimpan; retur tanpa transaksi asal diizinkan dengan penanda khusus. | BR-009 |  |
+| FR-RET-002 | Sistem mendukung retur sebagian. | Jumlah retur tidak melebihi jumlah terjual dikurangi jumlah yang sudah diretur; satu transaksi dapat memiliki beberapa retur. | BR-009 |  |
+| FR-RET-003 | Sistem mencatat kondisi barang retur. | Kondisi: layak jual atau rusak, dipilih per item setelah pemeriksaan; kondisi tersimpan di riwayat retur. | BR-009 |  |
+| FR-RET-004 | Sistem menyesuaikan stok berdasarkan kondisi barang. | Layak jual menambah stok layak jual dan mengurangi HPP barang sebesar HPP saat dijual; rusak masuk stok rusak bernilai nol dan tidak menambah stok layak jual; setiap perubahan tercatat. | BR-009, BR-016 | TBD-07 |
+| FR-RET-005 | Sistem mencatat status klaim marketplace. | Status: belum diajukan, dalam proses, disetujui, ditolak; perubahan status menyimpan tanggal dan pengguna. | BR-009 | TBD-06 |
+| FR-RET-006 | Sistem mencatat status dana retur terpisah dari status klaim. | Status dana: belum diproses, menunggu pengembalian dana, dana dikembalikan, dana tetap hak penjual, belum dapat dipastikan; mengubah status klaim tidak otomatis mengubah status dana. | BR-009 | TBD-06 |
+| FR-RET-007 | Sistem mencatat dampak retur terhadap penjualan, refund, dan HPP. | Dana dikembalikan: refund mengurangi penjualan neto. Dana tetap hak penjual: penjualan neto tidak berkurang. Nilai refund tidak melebihi total item yang diretur; laporan keuntungan memakai nilai ini. | BR-009, BR-012 | TBD-06 |
+| FR-RET-008 | Sistem menghapuskan stok rusak dengan alasan. | Penghapusan mengurangi stok rusak; penghapusan barang yang tidak berasal dari retur dicatat sebagai penghapusan persediaan bernilai HPP varian dan masuk laba bersih. | BR-009 | TBD-07 |
+| FR-RET-009 | Sistem menampilkan riwayat retur pelanggan dan supplier. | Daftar menampilkan transaksi asal, item, kondisi, status klaim, status dana, dan dampak stok; dapat disaring menurut tanggal, kanal, dan status. | BR-009 |  |
+
+### 3.6 Modul Pengeluaran Operasional
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-EXP-001 | Sistem mencatat pengeluaran operasional. | Data berisi tanggal, kategori, nominal, keterangan, dan pengguna; nominal harus lebih dari nol; pengeluaran muncul di riwayat dan laporan. | BR-017 |  |
+| FR-EXP-002 | Sistem mengelola kategori pengeluaran. | Contoh kategori: parkir, transportasi, listrik, lainnya; pengguna dapat menambah dan menonaktifkan kategori; pembelian bahan kemasan tidak termasuk pengeluaran operasional. | BR-010, BR-017 | TBD-21 |
+| FR-EXP-003 | Sistem mengoreksi pengeluaran lewat void. | Pengeluaran yang salah di-void dengan alasan; catatan awal tetap terlihat; total pengeluaran periode terhitung ulang. | BR-015, BR-017 | TBD-12 |
+| FR-EXP-004 | Sistem menampilkan riwayat pengeluaran. | Daftar dapat disaring menurut tanggal dan kategori; pengeluaran void ditandai dan tidak dihitung di total. | BR-017 |  |
+
+### 3.7 Modul Persediaan Bahan Kemasan
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-PACK-001 | Sistem mengelola data bahan kemasan. | Setiap bahan punya nama, satuan beli, satuan pakai, dan faktor konversi (misalnya 1 roll = 100 meter); batas stok minimum opsional. | BR-010 | TBD-16, TBD-22 |
+| FR-PACK-002 | Sistem mencatat pembelian bahan kemasan sebagai persediaan. | Data berisi tanggal, bahan, jumlah beli, harga, dan total; pembelian langsung lunas; stok bertambah dalam satuan pakai; pembelian tidak muncul sebagai pengeluaran operasional. | BR-010 | TBD-15 |
+| FR-PACK-003 | Sistem mencatat pemakaian bahan kemasan per transaksi penjualan. | Pengguna memilih bahan dan jumlah pakai pada transaksi; stok berkurang; pemakaian melebihi stok ditolak; pemakaian terhubung ke nomor transaksi. | BR-011 | TBD-09 |
+| FR-PACK-004 | Sistem menghitung biaya per satuan pakai dan biaya pemakaian. | Biaya per satuan pakai memakai rata-rata tertimbang bergerak; biaya baris = jumlah pakai × biaya per satuan, dibulatkan ke Rupiah; biaya tersimpan di transaksi dan tidak berubah saat harga beli kemasan berubah. | BR-011 | TBD-03, TBD-16 |
+| FR-PACK-005 | Sistem menampilkan stok dan pergerakan stok kemasan. | Setiap pembelian, pemakaian, dan penyesuaian membuat satu catatan; stok awal, masuk, keluar, dan akhir terhitung per periode. | BR-010 |  |
+| FR-PACK-006 | Sistem menyediakan penyesuaian stok kemasan. | Data berisi jumlah, waktu, pengguna, dan alasan opsional; stok tidak boleh menjadi negatif. | BR-010 | TBD-09 |
+| FR-PACK-007 | Sistem memberi peringatan stok kemasan rendah. | Bahan dengan stok di bawah atau sama dengan batas minimum diberi penanda dan tampil di dashboard. | BR-010, BR-012 | TBD-22 |
+| FR-PACK-008 | Sistem menampilkan riwayat pemakaian kemasan. | Daftar dapat disaring menurut tanggal, bahan, dan transaksi; dari transaksi dapat dibuka rincian kemasan yang dipakai. | BR-010 |  |
+
+### 3.8 Modul Dashboard
+
+Semua angka dashboard mengikuti rumus di BRD bagian 5 dan dapat difilter menurut periode (hari ini, 7 hari, bulan ini, rentang bebas).
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-DASH-001 | Dashboard menampilkan ringkasan penjualan. | Menampilkan penjualan neto dan jumlah transaksi pada periode terpilih; transaksi dibatalkan tidak dihitung; angka sama dengan laporan penjualan periode yang sama. | BR-012 |  |
+| FR-DASH-002 | Dashboard menampilkan total pengeluaran operasional. | Hanya pengeluaran operasional yang tidak di-void; tidak termasuk pembelian kemasan. | BR-012 |  |
+| FR-DASH-003 | Dashboard menampilkan ringkasan keuntungan. | Menampilkan laba kotor dan laba bersih sesuai rumus BRD; angka sama dengan laporan keuntungan. | BR-012 | TBD-03, TBD-04, TBD-06 |
+| FR-DASH-004 | Dashboard menampilkan informasi stok produk dan kemasan. | Menampilkan daftar varian dan bahan yang stoknya di bawah atau sama dengan batas minimum; dapat dibuka ke detail. | BR-012, BR-016 | TBD-22 |
+| FR-DASH-005 | Dashboard menampilkan pembelian dan tagihan supplier. | Menampilkan total pembelian periode, total sisa tagihan, dan daftar tagihan terlambat. | BR-020 | TBD-17 |
+| FR-DASH-006 | Dashboard menampilkan transaksi yang belum selesai. | Menampilkan pesanan berstatus diproses, pembayaran belum dibayar, dan pencairan belum cair atau sebagian. | BR-012 | TBD-14 |
+| FR-DASH-007 | Dashboard menampilkan ringkasan arus kas. | Menampilkan kas masuk dan kas keluar periode terpilih menurut tanggal terima dan tanggal bayar. | BR-020 |  |
+
+### 3.9 Modul Riwayat
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-HIST-001 | Sistem menampilkan riwayat penjualan. | Daftar dan detail transaksi; pencarian nomor atau resi; filter tanggal, kanal, dan status; menampilkan pembuat transaksi. | BR-002, BR-014 |  |
+| FR-HIST-002 | Sistem menampilkan riwayat pembelian dan penerimaan barang. | Daftar pembelian dengan penerimaannya; filter supplier, tanggal, dan status. | BR-007 |  |
+| FR-HIST-003 | Sistem menampilkan riwayat pembayaran. | Pembayaran supplier, pembayaran penjualan, dan pencairan dana marketplace tampil dengan tanggal, nominal, dan pengguna; yang di-void ditandai. | BR-008, BR-014 |  |
+| FR-HIST-004 | Sistem menampilkan riwayat retur. | Retur pelanggan dan supplier dalam satu halaman dengan filter jenis dan tanggal. | BR-009 |  |
+| FR-HIST-005 | Sistem menampilkan riwayat perubahan stok produk. | Setiap catatan menampilkan jenis, jumlah, saldo, referensi, pengguna, dan waktu. | BR-014, BR-016 |  |
+| FR-HIST-006 | Sistem menampilkan riwayat perubahan stok kemasan. | Setiap catatan menampilkan jenis, jumlah, saldo, referensi, pengguna, dan waktu. | BR-014 |  |
+| FR-HIST-007 | Sistem menampilkan riwayat status transaksi. | Setiap perubahan status pesanan, pembayaran, dan pencairan tampil beserta waktu dan pengguna. | BR-002, BR-014 |  |
+| FR-HIST-008 | Sistem menampilkan riwayat aktivitas pengguna. | Aktivitas penting dapat disaring menurut pengguna, jenis aktivitas, dan tanggal; data tetap ada setelah akun dinonaktifkan. | BR-014 |  |
+
+### 3.10 Modul Laporan
+
+Semua laporan memakai filter periode (harian, bulanan, rentang bebas) dan data historis sesuai waktu transaksi.
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-REPORT-001 | Laporan penjualan. | Menampilkan jumlah transaksi, penjualan neto, dan item terjual menurut periode dan kanal; transaksi dibatalkan tidak dihitung. | BR-012 | TBD-23 |
+| FR-REPORT-002 | Laporan pembelian. | Menampilkan total pembelian, rincian item, supplier, dan status pembayaran menurut periode dan supplier. | BR-012 | TBD-23 |
+| FR-REPORT-003 | Laporan pengeluaran operasional. | Menampilkan total per kategori menurut periode; pengeluaran void tidak dihitung; pembelian kemasan tidak muncul di sini. | BR-012, BR-017 | TBD-23 |
+| FR-REPORT-004 | Laporan persediaan produk. | Menampilkan stok dan nilai persediaan per varian (stok × HPP), stok rusak, dan varian stok rendah. | BR-012 | TBD-03 |
+| FR-REPORT-005 | Laporan persediaan kemasan. | Menampilkan stok awal, pembelian, pemakaian, stok akhir, dan nilainya per bahan. | BR-012 | TBD-03 |
+| FR-REPORT-006 | Laporan HPP. | Menampilkan HPP barang dan biaya kemasan terpisah per periode dan per transaksi dari snapshot. | BR-011, BR-012 | TBD-03 |
+| FR-REPORT-007 | Laporan keuntungan. | Menampilkan penjualan neto, HPP barang, biaya kemasan, laba kotor, biaya marketplace, pengeluaran operasional, penghapusan persediaan, dan laba bersih sesuai rumus BRD; rumus tertulis di laporan. | BR-011, BR-012, BR-019 | TBD-03, TBD-04, TBD-06 |
+| FR-REPORT-008 | Laporan pembayaran dan utang supplier. | Menampilkan total pembelian, total dibayar, sisa tagihan, dan tagihan terlambat per supplier. | BR-020 | TBD-17 |
+| FR-REPORT-009 | Laporan retur. | Menampilkan retur pelanggan dan supplier menurut kondisi, status klaim, status dana, dan nilai refund. | BR-009, BR-012 | TBD-06 |
+| FR-REPORT-010 | Laporan arus kas. | Menampilkan kas masuk (penjualan offline dan dana marketplace yang cair) dan kas keluar (pembayaran supplier, pembelian kemasan, pengeluaran operasional, refund) menurut tanggal terjadi; pembelian tempo baru muncul saat dibayar. | BR-020 | TBD-14, TBD-15 |
+| FR-REPORT-011 | Laporan dapat diekspor dan dicetak. | Setiap laporan dapat diunduh sebagai CSV dan dicetak lewat browser; angka ekspor sama dengan tampilan. | BR-012 | TBD-23 |
+
+### 3.11 Modul Pengaturan Sistem
+
+| ID | Requirement | Kriteria penerimaan | BR | TBD |
+| --- | --- | --- | --- | --- |
+| FR-SET-001 | Pengaturan informasi usaha. | Nama, alamat, dan telepon usaha dapat diubah dan tampil di nota. | BR-018 |  |
+| FR-SET-002 | Pengelolaan satuan. | Satuan produk dan kemasan dapat ditambah dan dinonaktifkan; satuan yang dipakai tidak dapat dihapus. | BR-018 | TBD-02 |
+| FR-SET-003 | Pengelolaan kanal penjualan. | Kanal dapat ditambah, diubah, dan dinonaktifkan; kanal yang dipakai transaksi tidak dihapus permanen. | BR-018 | TBD-20 |
+| FR-SET-004 | Pengelolaan kategori produk dan pengeluaran. | Kategori dapat ditambah, diubah nama, dan dinonaktifkan; riwayat tetap memakai kategori lama. | BR-018 | TBD-21 |
+| FR-SET-005 | Pengaturan batas stok minimum. | Batas diisi per varian dan per bahan kemasan; perubahan langsung memengaruhi peringatan. | BR-016, BR-018 | TBD-22 |
+| FR-SET-006 | Pengaturan operasional lainnya. | Durasi sesi dan format nota dapat diatur; pengaturan lain ditambahkan hanya setelah disepakati. | BR-018 | TBD-24 |
+
+## 4. Kebutuhan Nonfungsional
+
+Angka target bersifat usulan dan dapat diubah setelah klien menyebutkan volume dan perangkat sebenarnya (TBD-24).
+
+| ID | Aspek | Kebutuhan terukur |
+| --- | --- | --- |
+| NFR-001 | Autentikasi | Semua halaman dan data internal hanya dapat diakses setelah login. |
+| NFR-002 | Keamanan password | Password disimpan dengan hash modern (misalnya bcrypt atau argon2), tidak pernah sebagai teks biasa atau dicatat di log. |
+| NFR-003 | Otorisasi | Pemeriksaan akses dilakukan di server pada setiap permintaan, bukan hanya di antarmuka. |
+| NFR-004 | Kinerja | Untuk data hingga 10.000 transaksi: halaman utama dan kasir terbuka di bawah 2 detik; pencarian produk menampilkan hasil di bawah 1 detik; laporan bulanan tampil di bawah 5 detik. |
+| NFR-005 | Konsistensi data | Operasi yang saling terkait (penjualan, stok, kemasan, HPP) berhasil seluruhnya atau dibatalkan seluruhnya; saldo stok selalu sama dengan jumlah catatan pergerakannya. |
+| NFR-006 | Pencegahan transaksi ganda | Mengirim formulir dua kali (klik ganda atau muat ulang) tidak membuat dua transaksi. |
+| NFR-007 | Kompatibilitas | Berfungsi di Chrome terbaru pada laptop atau PC dan Android; tata letak kasir dapat dipakai di layar 360 piksel ke atas. |
+| NFR-008 | Kemudahan penggunaan | Label formulir jelas, pesan kesalahan berbahasa Indonesia dan menyebut cara memperbaiki; pencatatan penjualan offline dapat diselesaikan dalam kurang dari 6 langkah layar. |
+| NFR-009 | Integritas riwayat | Data yang sudah dipakai transaksi tetap dapat ditelusuri walaupun produk, supplier, kanal, atau akun dinonaktifkan. |
+| NFR-010 | Validasi data | Sistem menolak nilai kosong yang wajib, kuantitas nol atau negatif, dan nominal tidak valid dengan pesan yang jelas. |
+| NFR-011 | Pemeliharaan | Penambahan fitur tidak mengubah data historis; perubahan skema dilakukan lewat migrasi. |
+| NFR-012 | Pencadangan data (usulan baru) | Data dicadangkan otomatis setiap hari dan dapat dipulihkan; belum pernah dibahas dengan klien. |
+
+## 5. Aturan Bisnis, Validasi, dan Koreksi Data
+
+### 5.1 Aturan bisnis
+
+SRS memakai aturan bisnis BRULE-001 sampai BRULE-028 dari BRD v0.5 bagian 5 tanpa perubahan. Rumus laba, HPP, dan arus kas juga mengikuti BRD bagian 5.
+
+### 5.2 Aturan validasi
+
+| ID | Aturan |
+| --- | --- |
+| VR-001 | Nomor transaksi penjualan dan pembelian unik. |
+| VR-002 | Barcode unik antarvarian. |
+| VR-003 | Kuantitas produk dan kemasan lebih dari nol dan sesuai satuan yang ditentukan. |
+| VR-004 | Pembayaran supplier tidak melebihi sisa tagihan. |
+| VR-005 | Setiap pembayaran terhubung ke satu pembelian; setiap penerimaan terhubung ke satu pembelian. |
+| VR-006 | Jumlah diterima tidak melebihi sisa jumlah pesanan. |
+| VR-007 | Jumlah retur tidak melebihi jumlah terjual dikurangi retur sebelumnya. |
+| VR-008 | Penjualan, pemakaian kemasan, dan penyesuaian tidak boleh membuat stok negatif. |
+| VR-009 | Data yang punya riwayat transaksi tidak dihapus permanen lewat proses operasional biasa. |
+| VR-010 | Nilai snapshot harga dan HPP pada transaksi tidak dapat diubah setelah disimpan. |
+| VR-011 | Laporan memakai data historis sesuai waktu transaksi, bukan harga terbaru. |
+| VR-012 | Diskon tidak membuat total transaksi negatif. |
+
+### 5.3 Penanganan kesalahan dan koreksi
+
+1. Kesalahan input penjualan, pembelian, pembayaran, dan pengeluaran dikoreksi lewat pembatalan (void) atau penyesuaian dengan alasan wajib; catatan awal tetap terlihat.
+2. Void membuat catatan pembalik, bukan mengubah angka lama, sehingga laporan periode lampau dapat ditelusuri.
+3. Kedua pengelola berwenang melakukan koreksi; pelaku dan waktu tercatat (TBD-12).
+4. Data yang tidak lolos validasi ditolak dengan pesan yang menjelaskan bagian yang salah.
+
+## 6. Rancangan Entitas Awal
+
+Bagian ini adalah daftar entitas untuk persiapan ERD. Atribut, kunci, dan relasi final ditentukan pada tahap perancangan database setelah TBD-01, 03, 04, 06, dan 10 dikonfirmasi; ERD sebelum itu hanya berstatus draf.
+
+| No. | Entitas | Fungsi | FR terkait |
+| --- | --- | --- | --- |
+| 1 | Users | Akun pengelola, status aktif | FR-AUTH |
+| 2 | Products | Produk utama | FR-PROD-001 |
+| 3 | ProductCategories | Kategori produk | FR-PROD-002, FR-SET-004 |
+| 4 | ProductVariants | Varian: barcode, satuan, harga, stok, HPP | FR-PROD-003, 004 |
+| 5 | VariantChannelPrices | Harga jual khusus per kanal | FR-SALE-013 |
+| 6 | Units | Satuan produk dan kemasan | FR-SET-002 |
+| 7 | Suppliers | Data supplier | FR-SUP-001 |
+| 8 | VariantSuppliers | Hubungan varian dan supplier (tingkat varian) | FR-PROD-007 |
+| 9 | PurchasePriceHistories | Riwayat harga beli per varian | FR-PROD-005 |
+| 10 | StockMovements | Pergerakan stok produk, termasuk stok rusak | FR-PROD-008, FR-RET-004 |
+| 11 | SalesChannels | Kanal penjualan | FR-SET-003 |
+| 12 | Sales | Transaksi penjualan, diskon, biaya tambahan, biaya marketplace | FR-SALE-001 sampai 007 |
+| 13 | SaleItems | Item penjualan dengan snapshot harga dan HPP | FR-SALE-012 |
+| 14 | SaleStatusHistories | Riwayat status pesanan, pembayaran, pencairan | FR-SALE-008 |
+| 15 | SalePayments | Pembayaran penjualan | FR-SALE-001 |
+| 16 | MarketplaceSettlements | Pencairan dana marketplace | FR-SALE-009 |
+| 17 | Purchases | Pembelian supplier dan status | FR-PUR-001, 002 |
+| 18 | PurchaseItems | Item pembelian | FR-PUR-001 |
+| 19 | GoodsReceipts | Penerimaan barang | FR-PUR-003 |
+| 20 | GoodsReceiptItems | Item yang diterima | FR-PUR-003 |
+| 21 | SupplierPayments | Pembayaran supplier, termasuk void | FR-PUR-006, 007 |
+| 22 | SupplierReturns | Retur ke supplier | FR-PUR-009 |
+| 23 | SupplierReturnItems | Item retur supplier | FR-PUR-009 |
+| 24 | CustomerReturns | Retur pelanggan, status klaim, status dana | FR-RET-001 sampai 007 |
+| 25 | CustomerReturnItems | Item retur dengan kondisi | FR-RET-002, 003 |
+| 26 | MarketplaceClaims | Klaim marketplace, terpisah dari dana | FR-RET-005 |
+| 27 | StockWriteOffs | Penghapusan stok rusak | FR-RET-008 |
+| 28 | PackagingMaterials | Bahan kemasan, satuan beli, satuan pakai, konversi | FR-PACK-001 |
+| 29 | PackagingPurchases | Pembelian kemasan (tunai) | FR-PACK-002 |
+| 30 | PackagingMovements | Pergerakan stok kemasan | FR-PACK-005, 006 |
+| 31 | SalePackagingUsages | Pemakaian kemasan per transaksi dengan biaya tersimpan | FR-PACK-003, 004 |
+| 32 | Expenses | Pengeluaran operasional, termasuk void | FR-EXP-001, 003 |
+| 33 | ExpenseCategories | Kategori pengeluaran | FR-EXP-002 |
+| 34 | BusinessSettings | Informasi dan pengaturan usaha | FR-SET-001, 006 |
+| 35 | ActivityLogs | Riwayat aktivitas pengguna | FR-AUTH-006, FR-HIST-008 |
+
+### Catatan rancangan
+
+1. `VariantSuppliers` berada di tingkat varian karena harga beli melekat pada varian (TBD-25).
+2. `StockMovements` dan `PackagingMovements` adalah sumber saldo stok; saldo di tabel utama harus selalu cocok dengan jumlah catatannya.
+3. `SaleItems` dan `SalePackagingUsages` menyimpan snapshot harga, HPP, dan biaya.
+4. `MarketplaceClaims` dipisah dari `MarketplaceSettlements` karena status klaim tidak selalu sama dengan status dana.
+5. Pembayaran, pengeluaran, dan transaksi memakai penanda void dan pembuat void, bukan penghapusan baris.
+6. Entitas dapat digabung atau disederhanakan pada tahap ERD selama kebutuhan pencatatan tetap terpenuhi.
+
+## 7. TBD dan Dampaknya pada Requirement
+
+ID dan isi TBD sama dengan BRD v0.5 bagian 8 (pertanyaan dan asumsi lengkap ada di sana). Tabel ini menunjukkan requirement yang harus ditinjau ulang jika jawaban klien berbeda dari asumsi. Prioritas menunjukkan pengaruhnya pada struktur database.
+
+| TBD | Topik | Prioritas | Requirement terdampak |
+| --- | --- | --- | --- |
+| TBD-01 | Stok varian | Tinggi | FR-PROD-003 |
+| TBD-02 | Satuan produk | Sedang | FR-PROD-003, FR-SET-002 |
+| TBD-03 | Metode HPP | Tinggi | FR-SALE-012, FR-PROD-006, FR-PACK-004, FR-DASH-003, FR-REPORT-004 sampai 007 |
+| TBD-04 | Biaya marketplace | Tinggi | FR-SALE-007, FR-DASH-003, FR-REPORT-007 |
+| TBD-05 | Harga per kanal | Sedang | FR-SALE-013 |
+| TBD-06 | Retur marketplace dan dana | Tinggi | FR-RET-005 sampai 007, FR-DASH-003, FR-REPORT-007, 009 |
+| TBD-07 | Barang rusak | Sedang | FR-RET-004, FR-RET-008 |
+| TBD-08 | Penerimaan sebagian | Sedang | FR-PUR-002, FR-PUR-003 |
+| TBD-09 | Stok negatif | Sedang | FR-SALE-011, FR-PROD-009, FR-PACK-003, FR-PACK-006 |
+| TBD-10 | Waktu pengurangan stok | Tinggi | FR-SALE-011 |
+| TBD-11 | Pembatalan penjualan | Sedang | FR-SALE-010 |
+| TBD-12 | Koreksi data | Sedang | FR-PUR-007, FR-PUR-008, FR-EXP-003 |
+| TBD-13 | Diskon dan biaya tambahan | Rendah | FR-SALE-005, FR-SALE-006 |
+| TBD-14 | Status dan metode pembayaran | Sedang | FR-SALE-001, 008, 009, FR-DASH-006, FR-REPORT-010 |
+| TBD-15 | Pembelian kemasan tunai atau tempo | Sedang | FR-PACK-002, FR-REPORT-010 |
+| TBD-16 | Pembulatan dan konversi satuan | Sedang | FR-SALE-014, FR-PACK-001, FR-PACK-004 |
+| TBD-17 | Jatuh tempo | Sedang | FR-PUR-005, FR-DASH-005, FR-REPORT-008 |
+| TBD-18 | Retur supplier | Sedang | FR-PUR-009 |
+| TBD-19 | Pengelolaan akun | Rendah | FR-AUTH-003, FR-AUTH-004 |
+| TBD-20 | Kanal penjualan | Rendah | FR-SALE-003, FR-SET-003 |
+| TBD-21 | Kategori | Rendah | FR-PROD-002, FR-EXP-002, FR-SET-004 |
+| TBD-22 | Batas stok minimum | Rendah | FR-PROD-010, FR-PACK-001, 007, FR-DASH-004, FR-SET-005 |
+| TBD-23 | Laporan | Rendah | FR-REPORT-001 sampai 003, FR-REPORT-011 |
+| TBD-24 | Perangkat, nota, offline | Rendah | FR-SALE-002, FR-SALE-015, FR-PROD-004, FR-SET-006, NFR-007 |
+| TBD-25 | Supplier dan varian | Sedang | FR-PROD-007 |
+
+## 8. Kriteria Penerimaan Sistem
+
+Kriteria berstatus *Blocked* baru dapat dinyatakan lulus setelah TBD terkait dikonfirmasi atau asumsinya disetujui.
+
+| No. | Kriteria | Status pengujian |
+| --- | --- | --- |
+| 1 | Pengguna dapat login dan logout; halaman internal tertutup tanpa login. | Dapat diuji |
+| 2 | Kedua akun pengelola memakai semua fitur operasional dengan hak setara. | Dapat diuji |
+| 3 | Produk, varian, kategori, dan barcode dapat dikelola; scan barcode menemukan varian di kasir. | Blocked: TBD-01, TBD-02 |
+| 4 | Penjualan offline dan marketplace dapat dicatat dengan status, pembatalan, dan nota. | Blocked: TBD-10, TBD-11, TBD-13, TBD-14 |
+| 5 | Harga jual dan HPP historis tidak berubah ketika harga diperbarui. | Blocked: TBD-03 |
+| 6 | Pembelian multi-barang, penerimaan barang, dan pembayaran supplier bertahap dapat dicatat; stok hanya bertambah dari barang diterima. | Blocked: TBD-08 |
+| 7 | Tagihan supplier dengan jatuh tempo dan keterlambatan tampil di dashboard dan laporan. | Blocked: TBD-17 |
+| 8 | Retur pelanggan dan supplier dapat dicatat; status klaim terpisah dari status dana. | Blocked: TBD-06, TBD-07, TBD-18 |
+| 9 | Bahan kemasan dapat dibeli, dipakai, dan dipantau; biaya masuk HPP saat dipakai. | Blocked: TBD-03, TBD-15, TBD-16 |
+| 10 | Pengeluaran operasional tercatat terpisah dari HPP dan kemasan. | Dapat diuji |
+| 11 | Penjualan atau pemakaian melebihi stok ditolak. | Blocked: TBD-09 |
+| 12 | Laporan keuntungan dan arus kas menghasilkan angka yang sama dengan hitungan manual pada data uji. | Blocked: TBD-03, TBD-04, TBD-06 |
+| 13 | Dashboard dan laporan memakai angka yang sama untuk periode yang sama. | Dapat diuji |
+| 14 | Void pembelian, pembayaran, dan pengeluaran meninggalkan riwayat dan menghitung ulang total. | Blocked: TBD-12 |
+| 15 | Riwayat stok, status, dan aktivitas pengguna dapat ditelusuri. | Dapat diuji |
+| 16 | Pengaturan kanal, kategori, satuan, dan batas stok dapat diubah dan langsung berlaku. | Dapat diuji |
+
+## 9. Matriks Keterlacakan BRD ke SRS
+
+Setiap BR di BRD v0.5 punya minimal satu requirement di SRS.
+
+| ID BRD | Kebutuhan bisnis | Requirement SRS |
+| --- | --- | --- |
+| BR-001 | Penjualan offline dan marketplace | FR-SALE-001, 003, 004, 013 |
+| BR-002 | Transaksi terstruktur, status, pembatalan, nota | FR-SALE-001, 005, 006, 008, 010, 015; FR-HIST-001, 007 |
+| BR-003 | Harga dan HPP historis | FR-SALE-012; FR-PROD-005 |
+| BR-004 | Varian produk | FR-PROD-001, 002, 003 |
+| BR-005 | Barcode | FR-PROD-004; FR-SALE-002 |
+| BR-006 | Varian dan banyak supplier | FR-PROD-007; FR-SUP-001 |
+| BR-007 | Pembelian dan penerimaan barang | FR-PUR-001, 002, 003, 010; FR-PROD-005; FR-HIST-002 |
+| BR-008 | Pembelian tempo dan bertahap | FR-PUR-004, 006, 010; FR-HIST-003 |
+| BR-009 | Retur pelanggan dan supplier | FR-PUR-009; FR-RET-001 sampai 009; FR-HIST-004 |
+| BR-010 | Persediaan kemasan terpisah | FR-PACK-001, 002, 005 sampai 008; FR-EXP-002 |
+| BR-011 | Perhitungan HPP | FR-SALE-014; FR-PROD-006; FR-PACK-003, 004; FR-REPORT-006 |
+| BR-012 | Dashboard dan laporan | FR-DASH-001 sampai 004, 006; FR-REPORT-001 sampai 007, 009, 011 |
+| BR-013 | Dua akun setara | FR-AUTH-001 sampai 005, 007 |
+| BR-014 | Riwayat aktivitas | FR-AUTH-006; FR-HIST-001, 003, 005 sampai 008 |
+| BR-015 | Perlindungan data historis | FR-PROD-011; FR-SUP-001; FR-SALE-010; FR-PUR-007, 008; FR-EXP-003; FR-AUTH-004 |
+| BR-016 | Pengelolaan stok | FR-PROD-008, 009, 010; FR-SALE-011; FR-SET-005 |
+| BR-017 | Pengeluaran operasional | FR-EXP-001 sampai 004; FR-REPORT-003 |
+| BR-018 | Pengaturan sistem | FR-SET-001 sampai 006 |
+| BR-019 | Biaya marketplace | FR-SALE-007, 009; FR-REPORT-007 |
+| BR-020 | Arus kas dan utang supplier | FR-PUR-005; FR-SALE-009; FR-DASH-005, 007; FR-REPORT-008, 010 |
+
+## 10. Riwayat Perubahan Dokumen
 
 | Versi | Tanggal | Perubahan |
-|---|---|---|
-| 0.1 | 11 November 2026 | Penyusunan awal SRS berdasarkan BRD |
-| 0.2 | 12 November 2026 | Pembaruan autentikasi dua akun `PENGELOLA` dengan hak akses setara, pencatatan aktivitas, serta penyesuaian kebutuhan Modul 2–5 |
+| --- | --- | --- |
+| 0.3 | 12 November 2026 | Revisi berdasarkan BRD v0.4. |
+| 0.4 | 13 November 2026 | Acuan BRD v0.5; ID aturan bisnis memakai BRULE (dirujuk dari BRD); kriteria penerimaan dikembalikan di setiap FR; TBD diselaraskan menjadi 25 butir; ditambah FR otorisasi server, diskon, biaya marketplace, pencairan dana, jatuh tempo, void, laporan arus kas, ekspor, kategori produk; NFR terukur dan anti transaksi ganda; matriks keterlacakan mencakup BR-001 sampai BR-020. |
 
----
-
-**Akhir Dokumen SRS WarungAdam v0.2**
+**Status: Draft Revision, menunggu review dan konfirmasi klien.**

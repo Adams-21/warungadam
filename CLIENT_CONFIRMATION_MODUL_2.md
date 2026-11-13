@@ -1,6 +1,6 @@
 # CLIENT REQUIREMENTS CONFIRMATION
 
-## WarungAdam — Modul 2: Produk & Stok
+## BizManage — Modul 2: Produk & Stok
 
 **Versi Dokumen:** 1.0  
 **Tanggal Konfirmasi:** 9 November 2026  
@@ -12,7 +12,7 @@
 
 Dokumen ini berisi hasil konfirmasi kebutuhan sistem pada Modul Produk & Stok berdasarkan jawaban yang telah diberikan oleh klien.
 
-Seluruh poin di bawah menjadi acuan dalam penyusunan BRD, SRS, desain database, dan pengembangan sistem WarungAdam.
+Seluruh poin di bawah menjadi acuan dalam penyusunan BRD, SRS, desain database, dan pengembangan sistem BizManage.
 
 ## 2. Hasil Konfirmasi Kebutuhan
 
@@ -63,6 +63,6 @@ Dengan demikian, Modul Produk & Stok dinyatakan **Confirmed by Client** dan dapa
 ---
 
 **Dokumen:** Client Requirements Confirmation  
-**Proyek:** WarungAdam  
+**Proyek:** BizManage  
 **Modul:** Produk & Stok  
 **Status:** Confirmed by Client

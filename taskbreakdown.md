@@ -126,4 +126,23 @@ Kerjakan task SET-01 sampai SET-09 secara bertahap dengan ketentuan:
 - [ ] SET-08 Pengujian
 - [ ] SET-09 Dokumentasi
 
+### Aturan Penanganan TBD pada SRS
+
+Sebelum mengerjakan fitur, baca dokumen `01-SRS.md` dan periksa seluruh requirement serta TBD yang berkaitan dengan task tersebut.
+
+Ketentuan:
+
+1. Requirement berstatus jelas dan tidak bergantung pada TBD boleh langsung dikerjakan.
+2. Requirement yang bergantung pada TBD hanya boleh dikerjakan pada bagian yang tidak terpengaruh oleh keputusan tersebut.
+3. Jangan menebak atau menetapkan sendiri keputusan bisnis yang belum dikonfirmasi klien.
+4. Jangan mengunci struktur database, alur transaksi, atau perhitungan keuangan yang berpotensi berubah akibat TBD.
+5. Jika diperlukan, gunakan implementasi sementara yang mudah diubah dan tandai sebagai `PROVISIONAL`.
+6. Jika suatu task tidak dapat dilanjutkan tanpa keputusan TBD, hentikan task tersebut dan laporkan:
+   - TBD yang menjadi penghambat.
+   - Bagian pekerjaan yang terdampak.
+   - Keputusan yang perlu dikonfirmasi.
+7. Jangan mengubah isi BRD atau SRS tanpa instruksi.
+
+**Prioritas:** kerjakan bagian yang sudah memiliki requirement jelas tanpa mengorbankan fleksibilitas untuk perubahan berikutnya.
+
 **Tahap berikutnya:** Step 2 - Autentikasi dan Hak Akses Pengguna.

@@ -1,51 +1,98 @@
-# SRS BizManage v0.4
+# SRS BizManage v1.2 - ERD Ready Candidate
 
-SRS v0.4 mengacu pada BRD v0.5. Requirement yang bergantung pada TBD memakai asumsi sementara dari BRD bagian 8 dan ditandai Blocked pada kolom TBD sampai klien mengonfirmasi.
+SRS BizManage v1.2 merupakan pembaruan terhadap v1.1 dan kandidat spesifikasi siap ERD (*ERD Ready Candidate*) yang telah diselaraskan sepenuhnya dengan **BRD BizManage v0.8**. Pembaruan utama pada versi ini mencakup integrasi keputusan klien tanggal **20 November 2026** mengenai **Standar Ukuran Paket Kemasan** (`XS`, `S`, `M`, `L`, `XL`, `XXL`, dan kategori ukuran dinamis lainnya), fleksibilitas penambahan/pengurangan jenis material kemasan, penyesuaian kuantitas pemakaian aktual per ukuran maupun saat transaksi penjualan, penutupan `TBD-16`, serta penambahan 2 entitas master (`PackageSizes` dan `PackageSizeItems`) sehingga total entitas menjadi **42 entitas**. Seluruh cacat logika keuangan, pemrosesan stok konkuren, buku besar mutasi per batch, siklus retur supplier barang pengganti, pencadangan lokal (`SUCCESS`, `FAILED`, `MISSED`/`OVERDUE`), dan konsistensi antar-entitas dari v1.1 dipertahankan secara utuh.
+
+Requirement yang bergantung pada keputusan klien yang belum final memakai *Asumsi Sementara* dari BRD v0.8 Bagian 8.2 dan ditandai pada kolom **TBD** dengan status pengujian *Blocked* hingga klien memberikan konfirmasi resmi.
 
 ## 1. Pendahuluan
 
 | Informasi | Keterangan |
 | --- | --- |
-| Nama sistem | BizManage, Sistem Kasir dan Manajemen Usaha |
-| Versi dokumen | 0.4, Draft Revision |
-| Dokumen acuan | BRD v0.5 |
-| Status | Draft, menunggu review dan konfirmasi klien |
+| Nama sistem | BizManage, Sistem Manajemen Keuangan dan Operasional Usaha Reseller |
+| Versi dokumen | 1.2 - ERD Ready Candidate |
+| Dokumen acuan utama | BRD BizManage v0.8 |
+| Dokumen terdahulu | SRS BizManage v0.4, v0.7, v0.8, v0.9, v1.0 Draft, v1.1 |
+| Status | Ready for ERD Construction (seluruh 42 entitas inti dan aturan integritas siap diturunkan langsung menjadi ERD tanpa audit ulang; 5 TBD tersisa pada Bagian 7 sudah memiliki rancangan default siap pakai) |
 
-SRS ini menjadi dasar perancangan database, antarmuka, implementasi, dan pengujian. Sebelas modul sama dengan BRD v0.5: autentikasi dan pengguna, kasir dan transaksi, produk dan stok, supplier dan pembelian, retur, pengeluaran operasional, persediaan bahan kemasan, dashboard, riwayat, laporan, dan pengaturan.
+### 1.1 Tujuan dokumen
 
-### Cara membaca tabel requirement
+SRS ini menjadi acuan teknis tunggal untuk perancangan Entity Relationship Diagram (ERD), migrasi skema Prisma/PostgreSQL, antarmuka pengguna, implementasi logika bisnis, konfigurasi server lokal LAN, dan pengujian sistem. Sebelas modul fungsional mengikuti struktur BRD v0.8:
+1. Autentikasi dan Pengguna
+2. Kasir dan Transaksi
+3. Produk dan Stok
+4. Supplier dan Pembelian Barang
+5. Retur Barang
+6. Pengeluaran Operasional
+7. Persediaan Perlengkapan Kemasan
+8. Dashboard
+9. Riwayat
+10. Laporan
+11. Pengaturan Sistem
 
-Kolom **BR** menunjuk kebutuhan bisnis di BRD. Kolom **TBD** menunjuk keputusan klien yang belum final; requirement dengan TBD memakai asumsi sementara dari BRD bagian 8 dan kriteria pengujiannya berstatus *Blocked* sampai TBD dikonfirmasi.
+### 1.2 Cara membaca tabel requirement
 
-### Istilah
+- Kolom **BR** merujuk pada kode Kebutuhan Bisnis (`BR-001` sampai `BR-021`) pada BRD v0.8 Bagian 4.
+- Kolom **TBD** merujuk pada keputusan bisnis yang masih terbuka pada BRD v0.8 Bagian 8.2. Requirement yang memiliki kode TBD menggunakan *Asumsi Sementara* dan kriteria pengujiannya berstatus *Blocked* sampai dikonfirmasi klien.
+- Rincian **Aktor, Alur Utama, Validasi, dan Kondisi Alternatif** per modul dijabarkan pada Bagian 3.12 untuk melengkapi spesifikasi teknis implementasi.
+
+### 1.3 Glosarium istilah
 
 | Istilah | Pengertian |
 | --- | --- |
-| HPP | Harga Pokok Penjualan: biaya yang melekat pada barang dan kemasan yang terjual |
-| Varian | Bentuk atau ukuran suatu produk yang punya barcode, harga, dan stok sendiri |
-| Snapshot HPP | Harga jual dan HPP yang disimpan pada saat transaksi terjadi |
-| Penerimaan barang | Pencatatan barang yang benar-benar diterima dari supplier |
-| Stok rusak | Stok barang tidak layak jual yang tidak ikut dijual |
-| Void | Pembatalan transaksi atau pembayaran dengan menyimpan catatan awal |
-| PENGELOLA | Peran pengguna dengan hak akses operasional setara |
+| Subtotal Item Neto (`SaleItems.subtotal_amount`) | Nilai baris transaksi setelah diskon per item: `ROUND(qty × unit_selling_price) − SaleItems.discount_amount` |
+| Subtotal Transaksi (`Sales.subtotal_amount`) | Jumlah seluruh subtotal item neto dalam satu transaksi (`SUM(SaleItems.subtotal_amount)`) |
+| Penjualan Bruto (`Sales.total_amount`) | Total nilai transaksi sebelum pengurangan refund pelanggan dan biaya admin marketplace (`Sales.subtotal_amount − Sales.discount_amount + Sales.additional_fee_amount`) |
+| Pemasukan Bersih | Pendapatan bersih yang menjadi hak usaha setelah dikurangi refund pelanggan dan biaya admin marketplace (`Total transaksi − refund kepada pelanggan − biaya admin marketplace`) |
+| HPP Produk | Harga Pokok Penjualan barang dagang yang dihitung menggunakan metode FIFO berdasarkan lapisan penerimaan barang (`StockBatches`) |
+| Standar Ukuran Paket (`PackageSize`) | Template kategori ukuran paket kemasan yang dinamis (contoh awal: `XS`, `S`, `M`, `L`, `XL`, `XXL`) beserta dimensi acuan dan komposisi daftar material serta takaran pakai standarnya (`PackageSizeItems`) |
+| HPP Kemasan | Biaya perlengkapan kemasan yang dibebankan per paket pada transaksi penjualan berdasarkan kuantitas pakai aktual tiap material (atau nilai hasil penyesuaian manual) |
+| Batch Stok (`StockBatch`) | Lapisan persediaan barang masuk dari penerimaan pembelian, retur tanpa referensi, penyesuaian masuk, atau barang pengganti retur supplier dengan urutan waktu masuk (`received_at`), kuantitas awal, sisa kuantitas, dan harga beli/pokok satuan |
+| Alokasi Batch (`SaleItemBatchAllocation`) | Catatan pemakaian kuantitas dari masing-masing `StockBatch` FIFO untuk satu item penjualan, termasuk akumulasi kuantitas yang dipulihkan (`reversed_qty`) |
+| Pemulihan Alokasi (`SaleItemBatchAllocationReversal`) | Catatan peristiwa pengembalian kuantitas stok ke `StockBatch` asal akibat pembatalan pesanan berstatus `Diproses` atau retur pelanggan layak jual |
+| Last-Allocated, First-Restored | Aturan pemulihan retur sebagian pada transaksi multi-batch yang memulihkan batch yang dialokasikan paling akhir terlebih dahulu |
+| Kolam Stok (`stock_pool`) | Pemisahan buku besar mutasi stok antara persediaan layak jual (`SELLABLE`) dan persediaan rusak hasil retur (`DAMAGED`) |
+| Varian | Bentuk atau ukuran spesifik suatu produk yang memiliki barcode, satuan, harga jual, dan saldo stok independen tanpa konversi otomatis antarvarian |
+| Snapshot HPP | Nilai harga jual, HPP produk (FIFO), dan HPP kemasan yang disimpan dan dikunci pada saat transaksi diproses |
+| Penerimaan Barang | Pencatatan kuantitas barang yang benar-benar diterima dari supplier (mendukung penerimaan bertahap/parsial) |
+| Stok Rusak | Persediaan barang tidak layak jual hasil retur yang dipisahkan dari stok layak jual dan bernilai persediaan nol |
+| Void | Pembatalan transaksi, pembayaran, pencairan, atau pengeluaran dengan menyimpan catatan awal dan membuat jejak pembatalan |
+| `PENGELOLA` | Peran pengguna dengan hak akses operasional penuh dan setara |
+| Server Lokal & LAN | Arsitektur deployment di mana aplikasi dan database PostgreSQL berjalan pada komputer server lokal usaha dan dapat diakses perangkat klien (PC/HP) melalui jaringan Wi-Fi lokal (LAN) tanpa koneksi internet |
 
-## 2. Deskripsi Umum
+## 2. Deskripsi Umum dan Arsitektur Teknis
 
-Sistem adalah aplikasi web untuk satu usaha. Penjualan marketplace dicatat manual; tidak ada integrasi API.
+### 2.1 Karakteristik pengguna
+
+Sistem digunakan oleh satu entitas usaha reseller dengan dua pengguna operasional yang memiliki hak akses setara:
 
 | Pengguna | Role | Hak akses |
 | --- | --- | --- |
-| Pengelola 1 | `PENGELOLA` | Semua fitur operasional |
-| Pengelola 2 | `PENGELOLA` | Semua fitur operasional, setara dengan Pengelola 1 |
+| Pengelola 1 | `PENGELOLA` | Seluruh modul operasional |
+| Pengelola 2 | `PENGELOLA` | Seluruh modul operasional, setara dengan Pengelola 1 |
 
-### Asumsi teknis
+### 2.2 Tumpukan teknologi dan lingkungan deployment
 
-1. Basis data relasional dengan transaksi atomik untuk operasi yang saling terkait.
-2. Nilai uang disimpan dalam Rupiah bilangan bulat.
-3. Kuantitas dan biaya per satuan memakai desimal 4 digit; biaya yang disimpan ke transaksi dibulatkan ke Rupiah terdekat per baris (TBD-16).
-4. Setiap transaksi punya nomor unik dan setiap aktivitas penting menyimpan pengguna dan waktu.
-5. Data historis tidak berubah ketika harga atau data master diperbarui.
-6. Teknologi implementasi ditentukan pada tahap arsitektur.
+| Komponen | Spesifikasi Teknis |
+| --- | --- |
+| Framework & Routing | Next.js App Router |
+| Bahasa Pemrograman | TypeScript |
+| ORM | Prisma ORM |
+| Basis Data | PostgreSQL (terpasang pada komputer server lokal usaha) |
+| Antarmuka & Styling | Tailwind CSS, Shadcn UI (seluruh aset font dan ikon dibundel lokal tanpa ketergantungan CDN eksternal) |
+| Manajemen State | Zustand |
+| Validasi Input | Zod |
+| Arsitektur Deployment | Komputer server lokal menjalankan service aplikasi Next.js (mode produksi `next start -H 0.0.0.0` pada IP statis LAN) dan service PostgreSQL. Perangkat PC dan HP mengakses aplikasi melalui browser modern pada jaringan Wi-Fi lokal (LAN) yang sama tanpa memerlukan koneksi internet. |
+| Pencadangan & Pemulihan | Skrip terjadwal tingkat sistem operasi menjalankan `pg_dump` otomatis setiap hari dengan format nama file ber-timestamp (`bizmanage_YYYYMMDD_HHMMSS.dump`) ke **perangkat penyimpanan fisik terpisah** dari media database utama. Skrip mencatat status eksekusi aktual (`SUCCESS` atau `FAILED` saat server menyala dan skrip berjalan) ke file log lokal terstruktur. Saat server/aplikasi menyala kembali atau dibuka, layanan pemeriksaan internal mengevaluasi timestamp `SUCCESS` terakhir untuk mendeteksi jadwal yang terlewat (`MISSED` / `OVERDUE`). Prosedur pemulihan menggunakan `pg_restore` / `psql`. |
+
+### 2.3 Asumsi dan batasan teknis
+
+1. **Atomisitas & Penguncian Konkuren:** Seluruh operasi penyimpanan yang mengubah saldo stok dan lebih dari satu tabel (pemrosesan pesanan, pemotongan batch FIFO, pengurangan/pemulihan stok kemasan, pemulihan alokasi, penerimaan barang, retur supplier, penyesuaian stok, penghapusan stok aktif, void) wajib dijalankan dalam **transaksi database atomik** (`prisma.$transaction`) dengan penguncian baris pesimistis (`SELECT ... FOR UPDATE`) pada `ProductVariants` (diurutkan berdasarkan `id ASC` untuk mencegah *deadlock*) dan `StockBatches` terkait guna mencegah konflik pemrosesan bersamaan oleh dua pengelola.
+2. **Tipe Data Nominal & Biaya Satuan:** Seluruh **nominal uang transaksi dan HPP hasil akhir** (harga jual, harga beli item, subtotal, diskon, biaya admin, pembayaran, HPP item/kemasan final) disimpan dalam tipe **bilangan bulat Rupiah** (`Int` / `BigInt`). Khusus untuk **biaya modal rata-rata per satuan pakai kemasan** (`PackagingMaterials.average_unit_cost`), disimpan dalam tipe `Decimal(12, 4)` agar tidak kehilangan presisi pecahan untuk satuan kecil (seperti `cm` pada bubble wrap dan lakban) sebelum dibulatkan ke Rupiah terdekat pada `SalePackagingUsages.calculated_hpp`.
+3. **Tipe Data & Validasi Kuantitas:** Seluruh kuantitas produk dan perlengkapan kemasan disimpan dalam tipe **`Decimal(12, 4)`**. Validasi jumlah angka desimal masukan dilakukan pada layer aplikasi menggunakan skema Zod berdasarkan konfigurasi satuan pada tabel `Units` (misalnya `pcs`, `botol`, `roll`, `pak` dibatasi ke bilangan bulat, sedangkan `cm`, `meter`, `liter`, `kg` mengizinkan pecahan hingga 4 digit desimal), menunggu konfirmasi `TBD-02` untuk satuan produk.
+4. **Pembulatan Kemasan:** Nilai kalkulasi biaya kemasan per paket dibulatkan ke Rupiah terdekat sebelum penyesuaian manual (dikonfirmasi pada `TBD-16`, BRD v0.8 Bagian 8.1).
+5. **Imutabilitas Historis:** Data historis transaksi bersifat *immutable* terhadap pembaruan harga jual, harga beli baru, perubahan komposisi template `PackageSizes`, maupun perubahan persentase default estimasi biaya admin marketplace.
+6. **Batasan MVP:** Seluruh pencatatan penjualan marketplace dilakukan secara manual; tidak ada integrasi API maupun sinkronisasi otomatis dengan marketplace pada ruang lingkup MVP.
+7. **Zona Waktu Operasional:** Seluruh kolom `DateTime` disimpan dalam format `timestamptz` (UTC) di PostgreSQL dan dikonversi ke zona waktu lokal usaha (mengikuti konfigurasi zona waktu sistem operasi server lokal) untuk pengelompokan batas tanggal harian laporan, jatuh tempo, dan evaluasi jadwal backup harian.
 
 ## 3. Kebutuhan Fungsional
 
@@ -53,345 +100,418 @@ Sistem adalah aplikasi web untuk satu usaha. Penjualan marketplace dicatat manua
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-AUTH-001 | Sistem menyediakan login dengan identitas akun dan password. | Kredensial benar masuk ke dashboard; kredensial salah ditolak dengan pesan tanpa menyebut bagian mana yang salah; halaman internal tidak dapat dibuka tanpa login. | BR-013 |  |
-| FR-AUTH-002 | Sistem mendukung dua akun awal dengan role `PENGELOLA` dan hak akses setara. | Kedua akun dapat login terpisah; kedua akun dapat membuka dan mengubah semua modul operasional; hak akses tidak dibedakan berdasarkan urutan pembuatan akun. | BR-013 |  |
-| FR-AUTH-003 | Pengguna dapat mengganti password sendiri; pengelola lain dapat mereset password akun rekannya. | Ganti password meminta password lama; reset menghasilkan password sementara yang wajib diganti saat login berikutnya; password baru disimpan sebagai hash; kejadian tercatat di riwayat aktivitas. | BR-013 | TBD-19 |
-| FR-AUTH-004 | Sistem dapat menonaktifkan dan mengaktifkan kembali akun. | Akun nonaktif tidak dapat login; riwayat transaksi tetap menyimpan nama pelaku; sistem menolak menonaktifkan akun terakhir yang aktif. | BR-013, BR-015 | TBD-19 |
-| FR-AUTH-005 | Sistem menyediakan logout dan mengakhiri sesi yang tidak aktif. | Setelah logout, tombol kembali tidak menampilkan data internal; sesi berakhir setelah 30 menit tanpa aktivitas (angka dapat diubah). | BR-013 |  |
-| FR-AUTH-006 | Sistem menyimpan pengguna dan waktu pada aktivitas penting. | Penjualan, pembelian, pembayaran, retur, pengeluaran, penyesuaian stok, pembatalan, dan perubahan akun menyimpan ID pengguna dan waktu; data pelaku tetap ada setelah akun dinonaktifkan. | BR-014 |  |
-| FR-AUTH-007 | Otorisasi diperiksa di sisi server pada setiap permintaan. | Permintaan tanpa sesi sah ditolak walaupun diketik langsung ke alamat internal; akses data tanpa login mengembalikan respons tidak berwenang. | BR-013 |  |
+| FR-AUTH-001 | Sistem menyediakan login dengan identitas akun dan password. | Kredensial valid mengarahkan ke dashboard; kredensial salah ditolak dengan pesan generik tanpa menyebut bagian mana yang salah; seluruh rute internal tertutup tanpa sesi aktif. | BR-013 |  |
+| FR-AUTH-002 | Sistem mendukung dua akun awal dengan role `PENGELOLA` dan hak akses setara. | Kedua akun dapat login terpisah dari perangkat PC maupun HP melalui jaringan Wi-Fi lokal (LAN); kedua akun memiliki akses penuh ke seluruh modul operasional tanpa pembedaan hierarki. | BR-013 |  |
+| FR-AUTH-003 | Pengguna yang sedang login dapat mengganti password sendiri; pemulihan akses akun dilakukan sesuai prosedur. | Ganti password memvalidasi kecocokan password lama dan panjang minimal password baru; password baru disimpan sebagai hash; seluruh sesi aktif lain milik akun tersebut dihentikan sementara sesi aktif saat ini tetap berjalan. | BR-013 | TBD-19 |
+| FR-AUTH-004 | Sistem dapat menonaktifkan dan mengaktifkan kembali akun. | Akun nonaktif tidak dapat login; jejak transaksi lama tetap menampilkan identitas pelaku; sistem menolak penonaktifan akun aktif terakhir. | BR-013, BR-015 | TBD-19 |
+| FR-AUTH-005 | Sistem menyediakan logout dan mengakhiri sesi yang tidak aktif secara otomatis. | Logout menghapus rekaman sesi di database dan mengarahkan ke halaman login; menekan tombol kembali browser tidak menampilkan data terlindungi; sesi kedaluwarsa otomatis setelah durasi tidak aktif berakhir. | BR-013 |  |
+| FR-AUTH-006 | Sistem menyimpan identitas pengguna dan waktu kejadian pada setiap aktivitas penting. | Penjualan, pembelian, penerimaan barang, pembayaran, pencairan, retur, pengeluaran, penyesuaian stok, penghapusan stok, pembatalan, pemulihan batch, dan perubahan akun mencatat `created_by_id` dan `created_at` yang tetap utuh meski akun dinonaktifkan. | BR-014 |  |
+| FR-AUTH-007 | Otorisasi diperiksa di sisi server pada setiap permintaan. | Permintaan halaman terproteksi maupun endpoint API/Server Action tanpa sesi database valid ditolak di sisi server walaupun diakses langsung lewat URL dari perangkat mana pun di jaringan LAN. | BR-013 |  |
 
 ### 3.2 Modul Kasir dan Transaksi
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-SALE-001 | Sistem mencatat penjualan offline. | Transaksi menyimpan nomor unik, tanggal dan waktu, pengguna, daftar varian, jumlah, harga jual, diskon, total, metode pembayaran, dan status; transaksi tersimpan muncul di riwayat penjualan. | BR-001, BR-002 | TBD-14 |
-| FR-SALE-002 | Sistem mencari produk lewat pencarian teks dan barcode di kasir. | Pencarian nama atau kode menampilkan varian yang cocok; scan barcode menambahkan varian ke transaksi; barcode tidak terdaftar menampilkan "produk tidak ditemukan"; varian nonaktif tidak dapat dipilih. | BR-005 | TBD-24 |
-| FR-SALE-003 | Sistem mencatat kanal penjualan pada setiap transaksi. | Kanal dipilih dari daftar di pengaturan (offline dan marketplace); kanal tersimpan di transaksi dan dapat dipakai sebagai filter. | BR-001 | TBD-20 |
-| FR-SALE-004 | Sistem mencatat penjualan marketplace secara manual. | Pengguna mengisi kanal, nomor transaksi atau resi, tanggal, item, jumlah, harga jual, dan biaya terkait; sistem tidak mengambil data otomatis; nomor resi yang sama pada kanal yang sama diberi peringatan duplikat. | BR-001 |  |
-| FR-SALE-005 | Sistem menghitung total transaksi. | Subtotal item = harga jual × jumlah; total = jumlah subtotal − diskon + biaya tambahan dari pelanggan; hasil sesuai hitungan manual pada contoh uji. | BR-002 | TBD-13 |
-| FR-SALE-006 | Sistem mendukung diskon per item dan per transaksi serta biaya tambahan dari pelanggan. | Diskon berupa nominal; diskon tidak membuat total negatif; biaya tambahan tersimpan terpisah dari subtotal. | BR-002 | TBD-13 |
-| FR-SALE-007 | Sistem mencatat biaya marketplace per pesanan marketplace. | Pengguna dapat mengisi komisi, biaya layanan, dan ongkir ditanggung penjual; biaya tersimpan terpisah dari HPP dan muncul di laporan keuntungan. | BR-019 | TBD-04 |
-| FR-SALE-008 | Sistem menyimpan tiga kelompok status: pesanan, pembayaran, dan pencairan dana. | Status pesanan: diproses, selesai, dibatalkan. Status pembayaran: belum dibayar, dibayar, dikembalikan. Status pencairan (marketplace): belum cair, sebagian cair, sudah cair, tidak dicairkan. Setiap perubahan menyimpan waktu dan pengguna. | BR-002 | TBD-14 |
-| FR-SALE-009 | Sistem mencatat jumlah dan tanggal dana marketplace yang cair. | Pencairan dapat dicatat bertahap; total cair tidak melebihi nilai yang berhak diterima kecuali ada catatan; status pencairan mengikuti total cair. | BR-019, BR-020 | TBD-14 |
-| FR-SALE-010 | Sistem membatalkan transaksi tanpa menghapusnya. | Pembatalan wajib alasan; transaksi tetap terlihat berstatus dibatalkan; stok produk kembali; pemakaian kemasan tidak dikembalikan kecuali pengguna memilih; pelaku dan waktu tercatat. | BR-002, BR-015 | TBD-11 |
-| FR-SALE-011 | Sistem mengurangi stok produk saat penjualan. | Offline: stok berkurang saat transaksi disimpan. Marketplace: stok berkurang saat pesanan dicatat. Penjualan ditolak jika stok varian tidak mencukupi. | BR-016 | TBD-09, TBD-10 |
-| FR-SALE-012 | Sistem menyimpan snapshot harga jual dan HPP setiap item. | Perubahan harga atau harga beli setelah transaksi tidak mengubah nilai transaksi lama; laporan periode lama menghasilkan angka yang sama sebelum dan sesudah perubahan harga. | BR-003 | TBD-03 |
-| FR-SALE-013 | Sistem mendukung harga jual per kanal. | Varian punya harga default dan dapat punya harga khusus per kanal; harga terisi otomatis sesuai kanal dan dapat diubah pada transaksi. | BR-001 | TBD-05 |
-| FR-SALE-014 | Sistem mencatat pemakaian bahan kemasan pada transaksi. | Pengguna memilih bahan dan jumlah pakai; biaya per baris dihitung dan masuk HPP transaksi; stok kemasan berkurang; rincian terlihat di detail transaksi (lihat FR-PACK-003). | BR-011 | TBD-16 |
-| FR-SALE-015 | Sistem dapat mencetak nota transaksi. | Nota menampilkan identitas usaha, nomor, tanggal, item, dan total; pencetakan lewat fitur cetak browser. | BR-002 | TBD-24 |
+| FR-SALE-001 | Sistem mencatat transaksi penjualan offline dan marketplace secara manual. | Transaksi menyimpan nomor unik (`transaction_number`), tanggal transaksi, kanal penjualan, pengguna, daftar varian, kuantitas, harga jual, diskon item, diskon transaksi, total transaksi, standar ukuran paket kemasan (opsional), metode pembayaran, dan kelompok status; transaksi tersimpan tampil pada riwayat penjualan. | BR-001, BR-002 | TBD-14 |
+| FR-SALE-002 | Sistem menyediakan pencarian teks dan pemindaian barcode varian di kasir. | Pencarian nama atau kode menampilkan varian aktif yang cocok; scan barcode langsung menambahkan varian ke keranjang transaksi; barcode tidak terdaftar menampilkan pesan "produk tidak ditemukan"; varian nonaktif (`is_active = false`) tidak dapat dipilih. | BR-005 |  |
+| FR-SALE-003 | Sistem mencatat kanal penjualan pada setiap transaksi. | Kanal dipilih dari daftar kanal aktif di pengaturan (misalnya Shopee, Tokopedia, Lazada, Offline); kanal tersimpan di transaksi dan dapat dijadikan filter laporan/riwayat. | BR-001 | TBD-20 |
+| FR-SALE-004 | Sistem mencatat penjualan marketplace secara manual. | Pengguna mengisi kanal, nomor transaksi/resi marketplace, tanggal, item, kuantitas, harga jual, dan biaya terkait tanpa integrasi API; nomor resi yang sama pada kanal yang sama memunculkan peringatan duplikat. | BR-001 |  |
+| FR-SALE-005 | Sistem menghitung total transaksi (Penjualan Bruto) secara konsisten tanpa menghitung diskon ganda. | Subtotal item neto (`SaleItems.subtotal_amount`) = `ROUND(harga jual × kuantitas) − SaleItems.discount_amount`; Subtotal transaksi (`Sales.subtotal_amount`) = `SUM(SaleItems.subtotal_amount)`; Total transaksi / Penjualan Bruto (`Sales.total_amount`) = `Sales.subtotal_amount − Sales.discount_amount + Sales.additional_fee_amount`; hasil sesuai hitungan manual tanpa pengurangan diskon dua kali. | BR-002 | TBD-13 |
+| FR-SALE-006 | Sistem mendukung diskon per item dan diskon per transaksi secara terpisah serta biaya tambahan dari pelanggan. | Diskon per item disimpan pada `SaleItems.discount_amount` (tidak melebihi `ROUND(qty × unit_selling_price)`), sedangkan diskon tingkat transaksi disimpan pada `Sales.discount_amount` (tidak melebihi `Sales.subtotal_amount`); validasi mencegah total transaksi bernilai negatif; biaya tambahan tersimpan terpisah pada `Sales.additional_fee_amount`. | BR-002 | TBD-13 |
+| FR-SALE-007 | Sistem menghitung estimasi biaya admin marketplace (default 22%) hanya untuk kanal marketplace dan mencatat biaya admin aktual secara terpisah sebagai pengurang Pemasukan Bersih. | Ketika transaksi baru dicatat pada kanal dengan `SalesChannels.is_marketplace = true`, sistem menghitung estimasi biaya admin default sebesar **22%** (atau persentase default yang berlaku saat transaksi dibuat) dari nilai jual produk setelah seluruh diskon dengan rumus `ROUND((Sales.subtotal_amount − Sales.discount_amount) × admin_fee_estimate_rate / 100)` (mengecualikan `additional_fee_amount`). Untuk kanal non-marketplace (`is_marketplace = false`), estimasi biaya admin bernilai `0`. Setelah dana diterima atau informasi settlement diketahui, pengguna dapat mengisi biaya admin aktual (`admin_fee_actual_amount`, termasuk nilai `0` apabila tidak ada potongan admin) yang menggantikan estimasi melalui pemeriksaan eksplisit `admin_fee_actual_amount IS NOT NULL`. Sistem menyimpan nilai estimasi dan aktual di kolom terpisah, tidak pernah menjumlahkan keduanya, tidak mengubah transaksi historis saat persentase default diubah, serta memperhitungkan biaya admin aktif sebagai pengurang **Pemasukan Bersih**. | BR-019 |  |
+| FR-SALE-008 | Sistem menyimpan tiga kelompok status transaksi secara terpisah: pesanan, pembayaran, dan pencairan dana. | Status pesanan: `Baru`, `Diproses`, `Selesai`, `Dibatalkan`. Status pembayaran: `Belum dibayar`, `Dibayar`, `Dikembalikan`. Status pencairan dana (marketplace): `Belum cair`, `Sebagian cair`, `Sudah cair`, `Tidak dicairkan`. Setiap perubahan status mencatat waktu dan pengguna pada `SaleStatusHistories`. | BR-002 | TBD-14 |
+| FR-SALE-009 | Sistem mencatat jumlah dan tanggal pencairan dana marketplace serta mendukung pembatalan catatan melalui void dengan pembaruan status otomatis. | Pencairan dapat dicatat bertahap pada `MarketplaceSettlements`; akumulasi dana cair aktif (`is_void = false`) dicatat pada arus kas masuk sesuai tanggal dana diterima dan memperbarui `settlement_status` (`0` = `Belum cair`; `> 0` dan `< (total_amount − biaya_admin_aktif)` = `Sebagian cair`; `>= (total_amount − biaya_admin_aktif)` atau ditandai final oleh pengelola = `Sudah cair`). Catatan pencairan atau pembayaran penjualan yang salah dapat di-void dengan alasan wajib tanpa menghapus baris data; jika seluruh pencairan di-void, pengelola dapat mengosongkan kembali `admin_fee_actual_amount` (`NULL`) agar estimasi 22% aktif kembali. | BR-015, BR-019, BR-020 | TBD-12, TBD-14 |
+| FR-SALE-010 | Sistem membatalkan pesanan yang belum selesai tanpa menghapus data historis dan memulihkan stok ke batch asal secara akurat. | Pembatalan wajib menyertakan alasan pada `SaleStatusHistories`; transaksi berstatus `Dibatalkan`. Aturan transisi: (1) `Baru → Dibatalkan`: tidak ada pemulihan stok karena stok dan alokasi batch belum dibuat; (2) `Diproses → Dibatalkan`: dalam transaksi atomik ber-lock, sistem memulihkan seluruh sisa kuantitas alokasi (`allocated_qty - reversed_qty`) kembali ke `remaining_qty` pada `StockBatch` asal, memperbarui `reversed_qty` pada `SaleItemBatchAllocations`, mencatat peristiwa pada `SaleItemBatchAllocationReversals` (`reversal_type = CANCELLATION`, `sale_status_history_id` terisi), dan mencatat mutasi `StockMovements` per batch (`stock_pool = SELLABLE`) tanpa menghapus riwayat alokasi; (3) `Selesai → Dibatalkan`: dilarang oleh sistem, pengembalian barang setelah `Selesai` wajib diproses melalui modul Retur Pelanggan. Perlakuan stok kemasan saat pembatalan mengikuti `TBD-11` dengan idempotensi `SalePackagingUsages.is_stock_restored`. | BR-002, BR-015 | TBD-11 |
+| FR-SALE-011 | Sistem mengurangi stok produk hanya ketika pesanan dikonfirmasi dan mulai diproses dengan penguncian konkuren. | Saat pesanan dicatat dengan status `Baru`, stok produk belum berkurang. Ketika pesanan diubah menjadi `Diproses` (atau langsung disimpan sebagai `Diproses`/`Selesai`), sistem mengunci baris varian dan batch (`FOR UPDATE`, diurutkan berdasarkan `variant_id ASC`), memvalidasi kecukupan stok, dan mengurangi stok satu kali (`is_stock_deducted = true`). Jika dua pengelola memproses penjualan varian yang sama bersamaan, transaksi kedua menunggu kunci transaksi pertama selesai sehingga tidak terjadi alokasi ganda. Perubahan status berikutnya (`Diproses → Selesai`) tidak memotong stok ulang. Penanganan stok tidak mencukupi mengikuti kebijakan sementara `TBD-09`. | BR-016 | TBD-09 |
+| FR-SALE-012 | Sistem menyimpan snapshot harga jual dan HPP produk (FIFO) setiap item saat pesanan diproses. | Saat pesanan diproses, sistem mengalokasikan kuantitas item dari `StockBatches` FIFO tertua (`ORDER BY received_at ASC, id ASC`) yang masih memiliki `remaining_qty > 0`, mencatat rincian tiap batch pada `SaleItemBatchAllocations` serta 1 baris `StockMovements` per batch, dan mengunci harga jual serta total HPP FIFO item pada transaksi; pembaruan harga jual atau harga beli baru tidak mengubah nilai transaksi lama. | BR-003, BR-011 |  |
+| FR-SALE-013 | Sistem mendukung harga jual per kanal penjualan. | Varian memiliki harga jual default dan dapat memiliki harga khusus per kanal; harga terisi otomatis saat kanal dipilih dan dapat disesuaikan pada transaksi. | BR-001 | TBD-05 |
+| FR-SALE-014 | Sistem mencatat pemakaian perlengkapan kemasan berbasis Standar Ukuran Paket pada transaksi secara opsional dan mendukung penyesuaian pemakaian aktual maupun HPP kemasan per paket. | Pemilihan standar ukuran paket kemasan (`PackageSizes`, contoh: `XS`, `S`, `M`, `L`, `XL`, `XXL`) bersifat opsional (transaksi dapat diproses tanpa kemasan). Ketika suatu ukuran paket dipilih, sistem otomatis memuat daftar material penyusunnya (`PackageSizeItems`) beserta takaran standar (`standard_usage_qty`) dan estimasi biayanya. Sebelum atau saat transaksi diproses, pengelola dapat menyesuaikan kuantitas pemakaian aktual per material (`actual_usage_qty`, misalnya menambah atau mengurangi `cm` bubble wrap/lakban sesuai kondisi aktual), menambah/menghapus material pada paket transaksi tersebut, maupun menyesuaikan nominal total HPP kemasan (`adjusted_hpp`). Nilai hasil hitung (`calculated_hpp`) dan nilai hasil penyesuaian (`adjusted_hpp`) disimpan terpisah; stok masing-masing material berkurang sesuai `actual_usage_qty` saat pesanan diproses (lihat FR-PACK-004 dan FR-PACK-005). | BR-011, BR-021 | TBD-03B |
+| FR-SALE-015 | Sistem dapat mencetak nota transaksi melalui browser. | Nota menampilkan identitas usaha, nomor transaksi, tanggal, daftar item, subtotal, diskon, biaya tambahan, total transaksi, dan rincian pembayaran; dicetak menggunakan fungsi cetak browser. | BR-002 |  |
 
 ### 3.3 Modul Produk dan Stok
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-PROD-001 | Sistem mengelola produk: tambah, ubah, lihat, cari, dan nonaktifkan. | Produk baru muncul di daftar dan pencarian; perubahan tersimpan; produk nonaktif tidak muncul di kasir tetapi tetap muncul di riwayat. | BR-004 |  |
-| FR-PROD-002 | Sistem mengelompokkan produk dalam kategori. | Pengguna dapat memilih kategori saat membuat produk dan memfilter daftar berdasarkan kategori. | BR-004 | TBD-21 |
-| FR-PROD-003 | Satu produk dapat memiliki beberapa varian. | Setiap varian punya nama, satuan, barcode, harga jual, harga beli terakhir, HPP, dan stok sendiri; transaksi menyimpan varian yang dijual. | BR-004 | TBD-01, TBD-02 |
-| FR-PROD-004 | Sistem menerima barcode lewat pemindaian atau ketik manual. | Barcode tersimpan pada varian; barcode yang sudah dipakai varian lain ditolak dengan pesan menyebut varian tersebut; satu varian boleh tanpa barcode. | BR-005 | TBD-24 |
-| FR-PROD-005 | Sistem mencatat riwayat harga beli per varian. | Setiap penerimaan atau pembelian baru menambah satu baris riwayat berisi tanggal, supplier, dan harga; baris lama tidak berubah. | BR-003, BR-007 |  |
-| FR-PROD-006 | Sistem menghitung HPP varian dengan rata-rata tertimbang bergerak. | Setelah penerimaan: HPP baru = (stok lama × HPP lama + qty masuk × harga beli) ÷ (stok lama + qty masuk); contoh uji menghasilkan angka yang sama dengan hitungan manual. | BR-011 | TBD-03 |
-| FR-PROD-007 | Satu varian dapat dihubungkan dengan lebih dari satu supplier. | Varian dapat memiliki beberapa supplier; satu supplier dapat menyediakan banyak varian; harga beli terakhir per supplier terlihat. | BR-006 | TBD-25 |
-| FR-PROD-008 | Sistem menampilkan stok dan mencatat setiap perubahannya. | Setiap perubahan stok membuat satu catatan berisi varian, jumlah, jenis (penerimaan, penjualan, retur, penyesuaian, pembatalan), referensi dokumen, pengguna, dan waktu; saldo stok sama dengan jumlah catatan. | BR-016 |  |
-| FR-PROD-009 | Sistem menyediakan penyesuaian stok manual. | Pengguna mengisi jumlah baru atau selisih; alasan opsional; stok tidak dapat menjadi negatif; pelaku dan waktu tercatat. | BR-016 | TBD-09 |
-| FR-PROD-010 | Sistem memberi peringatan stok rendah. | Varian dengan stok di bawah atau sama dengan batas minimum diberi penanda; daftar produk dapat diurutkan dan disaring menurut kondisi stok; batas kosong berarti tanpa peringatan. | BR-016 | TBD-22 |
-| FR-PROD-011 | Sistem melindungi produk yang punya riwayat dari penghapusan permanen. | Produk atau varian yang sudah dipakai transaksi hanya dapat dinonaktifkan; upaya hapus ditolak dengan pesan; produk tanpa riwayat boleh dihapus. | BR-015 |  |
+| FR-PROD-001 | Sistem mengelola produk: tambah, ubah, lihat, cari, dan nonaktifkan. | Produk baru tampil di daftar dan pencarian; perubahan tersimpan; produk nonaktif tidak muncul di kasir tetapi tetap tampil di riwayat transaksi. | BR-004 |  |
+| FR-PROD-002 | Sistem mengelompokkan produk ke dalam kategori. | Pengguna dapat memilih kategori saat membuat/mengubah produk dan memfilter daftar produk berdasarkan kategori. | BR-004 | TBD-21 |
+| FR-PROD-003 | Satu produk dapat memiliki beberapa varian dengan stok independen tanpa konversi otomatis. | Setiap varian memiliki nama, satuan (`Units`), barcode, harga jual, dan saldo stok mandiri bertipe `Decimal(12,4)`; perubahan stok pada satu varian (misalnya minyak 1 liter) tidak memengaruhi stok varian lain (misalnya minyak 2 liter). | BR-004 | TBD-02 |
+| FR-PROD-004 | Sistem menerima barcode melalui pemindaian atau ketik manual. | Barcode tersimpan pada varian; barcode yang sudah dipakai varian lain ditolak dengan pesan yang menyebut varian pemiliknya; varian diperbolehkan tidak memiliki barcode. | BR-005 |  |
+| FR-PROD-005 | Sistem mencatat riwayat harga beli aktual per varian berdasarkan transaksi pembelian. | `PurchaseItems` dan `StockBatches` menjadi sumber tunggal riwayat harga beli aktual per supplier dan varian (tanggal, supplier, kuantitas, harga beli); catatan historis tidak tertimpa dan tidak diduplikasi ke tabel riwayat terpisah. | BR-003, BR-007 |  |
+| FR-PROD-006 | Sistem menghitung HPP produk menggunakan metode FIFO (First In, First Out) berbasis batch penerimaan barang. | Setiap penerimaan barang membentuk satu baris `StockBatches` dengan waktu masuk (`received_at`) dan harga beli satuan masing-masing. Saat penjualan diproses, sistem mengambil kuantitas dari batch paling awal yang masih memiliki sisa stok (`remaining_qty > 0`). HPP item dihitung dari jumlah `(kuantitas terpakai dari tiap batch × harga beli batch tersebut)`. | BR-011 |  |
+| FR-PROD-007 | *(Sementara, menunggu TBD-25)* Sistem mendukung hubungan varian produk dengan lebih dari satu supplier beserta harga beli acuan masing-masing. | Berdasarkan rancangan sementara `VariantSuppliers`, satu varian dapat dihubungkan dengan beberapa supplier dan menyimpan harga beli acuan terbaru (`purchase_price`) per kombinasi varian–supplier, sedangkan riwayat harga beli aktual ditelusuri dari `PurchaseItems` dan `StockBatches`. Struktur ini masih menunggu konfirmasi eksplisit klien pada `TBD-25` (tidak mengasumsikan relasi supplier di tingkat produk otomatis berlaku tanpa konfirmasi). | BR-006 | TBD-25 |
+| FR-PROD-008 | Sistem menampilkan saldo stok, mencatat setiap mutasi secara atomik pada kolam stok terpisah (1 baris per batch terdampak), dan menyediakan rekonsiliasi buku besar stok. | Setiap perubahan stok pada `ProductVariants` (`stock_qty` atau `damaged_stock_qty`) wajib dijalankan dalam satu transaksi database atomik bersama pembentukan baris `StockMovements` (`stock_pool = SELLABLE` dengan `batch_id` wajib terisi 1 baris per batch terdampak, atau `stock_pool = DAMAGED` dengan `batch_id = NULL`). Sistem menyediakan pemeriksaan rekonsiliasi stok yang memverifikasi bahwa `ProductVariants.stock_qty` sama dengan `SUM(StockBatches.remaining_qty)` dan `SUM(StockMovements.qty_change)` untuk `stock_pool = SELLABLE`, serta `damaged_stock_qty` sama dengan `SUM(StockMovements.qty_change)` untuk `stock_pool = DAMAGED`. | BR-016 |  |
+| FR-PROD-009 | Sistem menyediakan penyesuaian stok manual dengan penetapan nilai pokok batch untuk penambahan stok. | Pengguna mengisi jumlah baru atau selisih; alasan opsional; dalam transaksi atomik ber-lock: (1) Penambahan stok membentuk batch penyesuaian baru (`source_type = ADJUSTMENT`) dalam urutan FIFO dengan nilai `unit_cost` yang terisi otomatis dari harga beli aktual terakhir pada `PurchaseItems` (jika ada) dan wajib diisi/disesuaikan manual oleh pengelola sebelum disimpan (`unit_cost >= 0`), serta mencatat 1 baris `StockMovements` (`stock_pool = SELLABLE`, `batch_id` terisi); (2) Pengurangan stok memotong batch FIFO tertua dengan tetap menjaga `StockBatches.remaining_qty >= 0` dan mencatat 1 baris `StockMovements` per batch yang dipotong (`stock_pool = SELLABLE`); pelaku dan waktu tercatat. Kebijakan stok negatif mengikuti `TBD-09`. | BR-016 | TBD-09 |
+| FR-PROD-010 | Sistem memberi peringatan stok rendah. | Varian dengan stok di bawah atau sama dengan batas minimum diberi penanda visual; daftar produk dapat diurutkan dan disaring menurut kondisi stok; batas kosong berarti tanpa peringatan. | BR-016 | TBD-22 |
+| FR-PROD-011 | Sistem melindungi produk dan varian yang memiliki riwayat dari penghapusan permanen. | Produk atau varian yang sudah dipakai pada transaksi hanya dapat dinonaktifkan (`is_active = false`); upaya hapus ditolak dengan pesan; produk tanpa riwayat boleh dihapus. | BR-015 |  |
 
 ### 3.4 Modul Supplier dan Pembelian Barang
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-SUP-001 | Sistem mengelola supplier: tambah, ubah, lihat, cari, dan nonaktifkan. | Data supplier berisi nama, telepon, alamat (opsional), dan catatan; supplier yang punya riwayat pembelian hanya dapat dinonaktifkan; supplier nonaktif tidak muncul di pembelian baru tetapi tetap muncul di riwayat. | BR-006, BR-015 |  |
-| FR-PUR-001 | Sistem mencatat pembelian dari supplier terdaftar dengan banyak barang. | Pembelian menyimpan nomor unik, supplier, tanggal, daftar varian, jumlah, harga beli, subtotal, total, catatan, dan pengguna; satu pembelian dapat berisi lebih dari satu varian. | BR-007 |  |
-| FR-PUR-002 | Sistem menyimpan status pembelian. | Status: draf, dikonfirmasi, diterima sebagian, diterima seluruhnya, dibatalkan. Draf menjadi dikonfirmasi; dikonfirmasi menjadi diterima sebagian atau seluruhnya sesuai penerimaan; pembatalan hanya sebelum ada penerimaan; perubahan status tercatat. | BR-007 | TBD-08 |
-| FR-PUR-003 | Sistem mencatat penerimaan barang. | Penerimaan memilih pembelian, varian, dan jumlah diterima; jumlah tidak melebihi sisa pesanan; stok dan HPP bertambah hanya sebesar jumlah diterima; penerimaan sebagian dapat dilanjutkan di kemudian hari. | BR-007 | TBD-08 |
-| FR-PUR-004 | Sistem mendukung pembelian tunai dan tempo. | Pembelian tunai langsung lunas; pembelian tempo menyimpan total tagihan, total dibayar, sisa tagihan, dan status pembayaran (belum dibayar, sebagian, lunas). | BR-008 |  |
-| FR-PUR-005 | Sistem menyimpan tanggal jatuh tempo pembelian tempo. | Tanggal jatuh tempo opsional; tagihan dengan sisa lebih dari nol dan lewat jatuh tempo ditandai terlambat dan tampil di dashboard. | BR-020 | TBD-17 |
-| FR-PUR-006 | Sistem mencatat pembayaran bertahap kepada supplier. | Setiap pembayaran menyimpan tanggal, nominal, metode, dan pengguna; total bayar dan sisa tagihan terhitung ulang; pembayaran melebihi sisa tagihan ditolak; lunas saat sisa nol. | BR-008 |  |
-| FR-PUR-007 | Sistem mengoreksi pembayaran supplier lewat void. | Pembayaran yang salah di-void dengan alasan; catatan awal tetap terlihat; sisa tagihan terhitung ulang; pembayaran pengganti dapat dicatat. | BR-015 | TBD-12 |
-| FR-PUR-008 | Sistem mengoreksi atau membatalkan pembelian dengan riwayat. | Pembelian yang belum diterima dapat dibatalkan dengan alasan; pembelian yang sudah diterima dikoreksi lewat retur atau penyesuaian stok, bukan diubah langsung. | BR-015 | TBD-12 |
-| FR-PUR-009 | Sistem mencatat retur barang kepada supplier. | Retur memilih pembelian asal, varian, jumlah, alasan, dan tanggal; hasil retur: pengembalian uang, barang pengganti, atau potongan tagihan; stok berkurang sesuai jumlah retur. | BR-009 | TBD-18 |
-| FR-PUR-010 | Sistem menampilkan riwayat pembelian. | Daftar dapat disaring menurut supplier, tanggal, status pembelian, dan status pembayaran; detail menampilkan item, penerimaan, dan pembayaran. | BR-007, BR-008 |  |
+| FR-SUP-001 | Sistem mengelola supplier: tambah, ubah, lihat, cari, dan nonaktifkan. | Data supplier berisi nama, telepon, alamat (opsional), dan catatan; supplier yang memiliki riwayat pembelian hanya dapat dinonaktifkan; supplier nonaktif tidak muncul pada pembelian baru tetapi tetap muncul di riwayat. | BR-006, BR-015 |  |
+| FR-PUR-001 | Sistem mencatat pembelian dari supplier terdaftar dengan banyak item barang. | Pembelian menyimpan nomor unik (`purchase_number`), supplier, tanggal, daftar varian, kuantitas dipesan (`Decimal(12,4)`), harga beli, subtotal, total, catatan, dan pengguna; satu dokumen pembelian dapat memuat lebih dari satu varian. | BR-007 |  |
+| FR-PUR-002 | Sistem menyimpan siklus status pembelian. | Status: `Draf`, `Dikonfirmasi`, `Diterima sebagian`, `Diterima seluruhnya`, `Dibatalkan`. `Draf` menjadi `Dikonfirmasi`; `Dikonfirmasi` menjadi `Diterima sebagian` atau `Diterima seluruhnya` sesuai akumulasi penerimaan; pembatalan hanya diperbolehkan sebelum ada penerimaan; perubahan status tercatat. | BR-007 |  |
+| FR-PUR-003 | Sistem mencatat penerimaan barang secara bertahap dan menambah stok serta lapisan FIFO sesuai kuantitas yang diterima. | Penerimaan menyimpan nomor unik (`receipt_number`), memilih pembelian, varian, dan jumlah diterima; jumlah diterima tidak melebihi sisa pesanan (`dipesan − sudah diterima`); sistem tidak menunggu seluruh pesanan selesai diterima untuk menambah stok; dalam satu transaksi atomik ber-lock, setiap penerimaan langsung menambah saldo stok varian, membentuk satu `StockBatch` baru (`source_type = PURCHASE_RECEIPT`) sebesar kuantitas yang diterima, dan mencatat `StockMovements` (`stock_pool = SELLABLE`, `batch_id` terisi). | BR-007, BR-011 |  |
+| FR-PUR-004 | Sistem mendukung pembelian tunai dan tempo. | Pembelian tunai langsung berstatus lunas; pembelian tempo menyimpan total tagihan, total dibayar, sisa tagihan, dan status pembayaran (`Belum dibayar`, `Sebagian`, `Lunas`). | BR-008 |  |
+| FR-PUR-005 | Sistem menyimpan tanggal jatuh tempo pembelian tempo. | Tanggal jatuh tempo opsional; tagihan dengan sisa lebih dari nol dan melewati jatuh tempo ditandai terlambat serta tampil pada dashboard dan laporan utang. | BR-020 | TBD-17 |
+| FR-PUR-006 | Sistem mencatat pembayaran bertahap kepada supplier. | Setiap pembayaran menyimpan tanggal, nominal, metode pembayaran, dan pengguna; total bayar dan sisa tagihan dihitung ulang otomatis; pembayaran melebihi sisa tagihan ditolak; status berubah menjadi `Lunas` saat sisa tagihan nol. | BR-008 |  |
+| FR-PUR-007 | Sistem mengoreksi pembayaran supplier melalui mekanisme void. | Pembayaran yang salah di-void dengan alasan wajib; catatan awal tetap terlihat dengan penanda void; sisa tagihan dihitung ulang; pembayaran pengganti dapat dicatat. | BR-015 | TBD-12 |
+| FR-PUR-008 | Sistem mengoreksi atau membatalkan pembelian dengan jejak riwayat. | Pembelian yang belum memiliki penerimaan dapat dibatalkan dengan alasan; pembelian yang sudah memiliki penerimaan dikoreksi melalui retur ke supplier atau penyesuaian stok, bukan diedit langsung. | BR-015 | TBD-12 |
+| FR-PUR-009 | Sistem mencatat retur barang kepada supplier beserta konsistensi nilai item, dampak stok batch asal, barang pengganti, dan penyelesaian finansialnya. | Retur menyimpan nomor unik (`return_number`), mengacu pada `GoodsReceiptItem` penerimaan asal, varian, jumlah, alasan, dan tanggal; hasil retur: `Pengembalian uang`, `Barang pengganti`, atau `Potongan tagihan`. Setiap baris `SupplierReturnItems` menghitung `subtotal = ROUND(qty × unit_price)` (berdasarkan harga beli batch asal), dan `SupplierReturns.return_amount` terisi otomatis dari `SUM(SupplierReturnItems.subtotal)` (tersimpan di `calculated_return_amount`) serta dapat disesuaikan manual sebelum disimpan apabila terdapat kesepakatan nilai dengan supplier. Dalam transaksi atomik ber-lock, sistem mengurangi `remaining_qty` langsung pada `StockBatch` penerimaan asal (menolak jika melebihi sisa batch) dan mencatat `StockMovements` (`stock_pool = SELLABLE`, `batch_id` terisi). Dampak penyelesaian: (1) `Potongan tagihan`: sisa tagihan (`Purchases.remaining_amount`) berkurang sebesar `return_amount` (tidak melebihi sisa tagihan); (2) `Pengembalian uang`: nominal `return_amount` dicatat pada arus kas masuk berdasarkan `settlement_date`; (3) `Barang pengganti`: saat barang pengganti fisik diterima dari supplier pada `settlement_date`, sistem membentuk `StockBatch` baru (`source_type = SUPPLIER_REPLACEMENT`, FK `supplier_return_id`) dengan `unit_cost = unit_price` batch retur asal dan mencatat `StockMovements` (`stock_pool = SELLABLE`) tanpa mengubah tagihan atau arus kas. | BR-009, BR-020 |  |
+| FR-PUR-010 | Sistem menampilkan riwayat pembelian dan rincian penerimaannya. | Daftar dapat disaring menurut supplier, tanggal, status pembelian, dan status pembayaran; halaman detail menampilkan kuantitas dipesan, kuantitas diterima, sisa belum diterima, daftar penerimaan bertahap, dan riwayat pembayaran. | BR-007, BR-008 |  |
 
 ### 3.5 Modul Retur Barang
 
+*(Menggunakan ketentuan retur yang telah dikonfirmasi klien pada BRD v0.8 Bagian 8.1).*
+
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-RET-001 | Sistem mencatat retur pelanggan yang terhubung ke transaksi penjualan asal. | Retur memilih transaksi asal, varian, jumlah, tanggal, dan alasan; pelaku dan waktu tersimpan; retur tanpa transaksi asal diizinkan dengan penanda khusus. | BR-009 |  |
-| FR-RET-002 | Sistem mendukung retur sebagian. | Jumlah retur tidak melebihi jumlah terjual dikurangi jumlah yang sudah diretur; satu transaksi dapat memiliki beberapa retur. | BR-009 |  |
-| FR-RET-003 | Sistem mencatat kondisi barang retur. | Kondisi: layak jual atau rusak, dipilih per item setelah pemeriksaan; kondisi tersimpan di riwayat retur. | BR-009 |  |
-| FR-RET-004 | Sistem menyesuaikan stok berdasarkan kondisi barang. | Layak jual menambah stok layak jual dan mengurangi HPP barang sebesar HPP saat dijual; rusak masuk stok rusak bernilai nol dan tidak menambah stok layak jual; setiap perubahan tercatat. | BR-009, BR-016 | TBD-07 |
-| FR-RET-005 | Sistem mencatat status klaim marketplace. | Status: belum diajukan, dalam proses, disetujui, ditolak; perubahan status menyimpan tanggal dan pengguna. | BR-009 | TBD-06 |
-| FR-RET-006 | Sistem mencatat status dana retur terpisah dari status klaim. | Status dana: belum diproses, menunggu pengembalian dana, dana dikembalikan, dana tetap hak penjual, belum dapat dipastikan; mengubah status klaim tidak otomatis mengubah status dana. | BR-009 | TBD-06 |
-| FR-RET-007 | Sistem mencatat dampak retur terhadap penjualan, refund, dan HPP. | Dana dikembalikan: refund mengurangi penjualan neto. Dana tetap hak penjual: penjualan neto tidak berkurang. Nilai refund tidak melebihi total item yang diretur; laporan keuntungan memakai nilai ini. | BR-009, BR-012 | TBD-06 |
-| FR-RET-008 | Sistem menghapuskan stok rusak dengan alasan. | Penghapusan mengurangi stok rusak; penghapusan barang yang tidak berasal dari retur dicatat sebagai penghapusan persediaan bernilai HPP varian dan masuk laba bersih. | BR-009 | TBD-07 |
-| FR-RET-009 | Sistem menampilkan riwayat retur pelanggan dan supplier. | Daftar menampilkan transaksi asal, item, kondisi, status klaim, status dana, dan dampak stok; dapat disaring menurut tanggal, kanal, dan status. | BR-009 |  |
+| FR-RET-001 | Sistem mencatat retur pelanggan yang terhubung ke transaksi penjualan asal. | Retur menyimpan nomor unik (`return_number`), memilih transaksi asal berstatus `Selesai`, varian, jumlah, tanggal, dan alasan; pelaku dan waktu tersimpan; retur tanpa referensi transaksi asal diizinkan dengan penanda khusus. | BR-009 |  |
+| FR-RET-002 | Sistem mendukung retur pelanggan sebagian dan bertahap. | Jumlah retur tidak melebihi kuantitas terjual dikurangi kuantitas yang sudah diretur sebelumnya (`allocated_qty - reversed_qty`); satu transaksi penjualan dapat memiliki beberapa peristiwa retur bertahap. | BR-009 |  |
+| FR-RET-003 | Sistem mencatat kondisi barang retur setelah pemeriksaan. | Kondisi: `Layak jual` atau `Rusak`, dipilih per item retur; kondisi tersimpan pada riwayat retur. | BR-009 |  |
+| FR-RET-004 | Sistem menyesuaikan stok dan memulihkan batch FIFO berdasarkan kondisi barang retur secara atomik. | (1) `Layak jual` dengan referensi transaksi asal: dalam transaksi atomik ber-lock, sistem memulihkan kuantitas ke `StockBatch` asal menggunakan urutan terbalik (*Last-Allocated, First-Restored*), memperbarui `reversed_qty` pada `SaleItemBatchAllocations`, mencatat peristiwa pada `SaleItemBatchAllocationReversals` (`reversal_type = CUSTOMER_RETURN`, `customer_return_item_id` terisi), menyimpan nilai HPP yang dipulihkan pada `CustomerReturnItems.restored_hpp_amount`, mencatat mutasi `StockMovements` per batch yang dipulihkan (`stock_pool = SELLABLE`, `RETUR_LAYAK_JUAL`, `batch_id` terisi), dan mengurangi HPP barang bersih; (2) `Layak jual` tanpa referensi transaksi asal: sistem membuat `StockBatch` baru bertipe `RETUR_TANPA_REFERENSI` dengan nilai `unit_cost` yang terisi otomatis dari harga beli aktual terakhir pada `PurchaseItems` (jika ada) dan wajib dapat disesuaikan manual oleh pengelola sebelum disimpan, serta mencatat `StockMovements` (`stock_pool = SELLABLE`, `batch_id` terisi); (3) `Rusak`: tidak memulihkan `remaining_qty` batch asal, menambahkan kuantitas ke `damaged_stock_qty` dengan nilai persediaan nol, dan mencatat mutasi `StockMovements` (`stock_pool = DAMAGED`, `RETUR_RUSAK`, `batch_id = NULL`). | BR-009, BR-016 |  |
+| FR-RET-005 | Sistem mencatat status klaim retur marketplace beserta riwayat perubahannya. | Status klaim: `Belum diajukan`, `Dalam proses`, `Disetujui`, `Ditolak`; setiap perubahan status menyimpan status lama, status baru, tanggal, dan pengguna pada `CustomerReturnStatusHistories`. | BR-009 |  |
+| FR-RET-006 | Sistem mencatat status dana retur terpisah dari status klaim beserta riwayat perubahannya. | Status dana: `Belum diproses`, `Menunggu pengembalian dana`, `Dana dikembalikan`, `Dana tetap hak penjual`, `Belum dapat dipastikan`; mengubah status klaim tidak otomatis mengubah status dana; setiap perubahan dicatat pada `CustomerReturnStatusHistories`. | BR-009 |  |
+| FR-RET-007 | Sistem mencatat dampak retur terhadap Pemasukan Bersih, refund, tanggal bayar refund, dan HPP tanpa melebihi nilai neto dibayar pembeli. | Jika status dana `Dana dikembalikan`, wajib mengisi tanggal pembayaran refund (`refund_paid_date`); nilai refund mengurangi **Pemasukan Bersih (Penjualan Neto)** dan dicatat pada arus kas keluar berdasarkan `refund_paid_date`. Jika `Dana tetap hak penjual`, Pemasukan Bersih tidak berkurang. Batas maksimal refund untuk retur berreferensi tidak boleh melebihi proporsi nilai neto item yang dibayarkan pembeli setelah diskon item dan proporsi diskon transaksi (`ROUND((SaleItems.subtotal_amount − proporsi_diskon_transaksi) × return_qty / SaleItems.qty)`). | BR-009, BR-012, BR-020 |  |
+| FR-RET-008 | Sistem menghapuskan stok rusak dengan alasan wajib dan memotong batch FIFO apabila berasal dari stok aktif. | Penghapusan menyimpan nomor unik (`writeoff_number`) dan alasan wajib dalam transaksi atomik ber-lock: (1) Jika `source_type = FROM_RETURN_DAMAGED`: mengurangi `damaged_stock_qty`, mencatat `StockMovements` (`stock_pool = DAMAGED`, `batch_id = NULL`), dengan `loss_value = 0` karena biaya telah diakui pada HPP saat penjualan; (2) Jika `source_type = FROM_ACTIVE_STOCK`: memotong lapisan `StockBatches` FIFO tertua (`remaining_qty`), mencatat detail alokasi pemotongan pada `StockWriteOffBatchAllocations`, mengurangi `ProductVariants.stock_qty`, mencatat 1 baris `StockMovements` per batch yang dipotong (`stock_pool = SELLABLE`, `batch_id` terisi), serta mengunci total nilai batch terpotong sebagai `loss_value` yang menjadi pengurang **Laba Bersih**. | BR-009 |  |
+| FR-RET-009 | Sistem menampilkan riwayat retur pelanggan dan supplier. | Daftar menampilkan nomor dokumen unik, referensi transaksi/pembelian asal, item, kondisi, status klaim, status dana, dan dampak stok; dapat disaring menurut tanggal, kanal, dan status. | BR-009 |  |
 
 ### 3.6 Modul Pengeluaran Operasional
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-EXP-001 | Sistem mencatat pengeluaran operasional. | Data berisi tanggal, kategori, nominal, keterangan, dan pengguna; nominal harus lebih dari nol; pengeluaran muncul di riwayat dan laporan. | BR-017 |  |
-| FR-EXP-002 | Sistem mengelola kategori pengeluaran. | Contoh kategori: parkir, transportasi, listrik, lainnya; pengguna dapat menambah dan menonaktifkan kategori; pembelian bahan kemasan tidak termasuk pengeluaran operasional. | BR-010, BR-017 | TBD-21 |
-| FR-EXP-003 | Sistem mengoreksi pengeluaran lewat void. | Pengeluaran yang salah di-void dengan alasan; catatan awal tetap terlihat; total pengeluaran periode terhitung ulang. | BR-015, BR-017 | TBD-12 |
-| FR-EXP-004 | Sistem menampilkan riwayat pengeluaran. | Daftar dapat disaring menurut tanggal dan kategori; pengeluaran void ditandai dan tidak dihitung di total. | BR-017 |  |
+| FR-EXP-001 | Sistem mencatat pengeluaran operasional usaha. | Data berisi tanggal, kategori, nominal (`> 0`), keterangan, dan pengguna; pengeluaran tersimpan tampil pada riwayat dan laporan. | BR-017 |  |
+| FR-EXP-002 | Sistem mengelola kategori pengeluaran operasional. | Contoh kategori: parkir, transportasi, listrik, lainnya; pengguna dapat menambah dan menonaktifkan kategori; pembelian perlengkapan kemasan dan potongan biaya admin marketplace dilarang dicatat sebagai pengeluaran operasional. | BR-010, BR-017 | TBD-21 |
+| FR-EXP-003 | Sistem mengoreksi pengeluaran operasional melalui mekanisme void. | Pengeluaran yang salah di-void dengan alasan wajib; catatan awal tetap terlihat; total pengeluaran periode dihitung ulang tanpa menyertakan catatan yang di-void. | BR-015, BR-017 | TBD-12 |
+| FR-EXP-004 | Sistem menampilkan riwayat pengeluaran operasional. | Daftar dapat disaring menurut rentang tanggal dan kategori; catatan void ditandai jelas dan dikecualikan dari total. | BR-017 |  |
 
-### 3.7 Modul Persediaan Bahan Kemasan
+### 3.7 Modul Persediaan Perlengkapan Kemasan
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-PACK-001 | Sistem mengelola data bahan kemasan. | Setiap bahan punya nama, satuan beli, satuan pakai, dan faktor konversi (misalnya 1 roll = 100 meter); batas stok minimum opsional. | BR-010 | TBD-16, TBD-22 |
-| FR-PACK-002 | Sistem mencatat pembelian bahan kemasan sebagai persediaan. | Data berisi tanggal, bahan, jumlah beli, harga, dan total; pembelian langsung lunas; stok bertambah dalam satuan pakai; pembelian tidak muncul sebagai pengeluaran operasional. | BR-010 | TBD-15 |
-| FR-PACK-003 | Sistem mencatat pemakaian bahan kemasan per transaksi penjualan. | Pengguna memilih bahan dan jumlah pakai pada transaksi; stok berkurang; pemakaian melebihi stok ditolak; pemakaian terhubung ke nomor transaksi. | BR-011 | TBD-09 |
-| FR-PACK-004 | Sistem menghitung biaya per satuan pakai dan biaya pemakaian. | Biaya per satuan pakai memakai rata-rata tertimbang bergerak; biaya baris = jumlah pakai × biaya per satuan, dibulatkan ke Rupiah; biaya tersimpan di transaksi dan tidak berubah saat harga beli kemasan berubah. | BR-011 | TBD-03, TBD-16 |
-| FR-PACK-005 | Sistem menampilkan stok dan pergerakan stok kemasan. | Setiap pembelian, pemakaian, dan penyesuaian membuat satu catatan; stok awal, masuk, keluar, dan akhir terhitung per periode. | BR-010 |  |
-| FR-PACK-006 | Sistem menyediakan penyesuaian stok kemasan. | Data berisi jumlah, waktu, pengguna, dan alasan opsional; stok tidak boleh menjadi negatif. | BR-010 | TBD-09 |
-| FR-PACK-007 | Sistem memberi peringatan stok kemasan rendah. | Bahan dengan stok di bawah atau sama dengan batas minimum diberi penanda dan tampil di dashboard. | BR-010, BR-012 | TBD-22 |
-| FR-PACK-008 | Sistem menampilkan riwayat pemakaian kemasan. | Daftar dapat disaring menurut tanggal, bahan, dan transaksi; dari transaksi dapat dibuka rincian kemasan yang dipakai. | BR-010 |  |
+| FR-PACK-001 | Sistem mengelola master perlengkapan kemasan secara dinamis beserta konversi satuan beli ke satuan pakai. | Pengelola dapat menambah, mengubah, atau menonaktifkan jenis material kemasan secara bebas (tidak terbatas 5 macam saja, misalnya kardus, plastik, bubble wrap, lakban, stiker fragile, kertas nota, dll.). Setiap material memiliki nama, satuan beli (`purchase_unit_id`, mis. roll/pak/pcs), satuan pakai (`usage_unit_id`, mis. `cm`/`pcs`/`lembar`), faktor konversi (`conversion_factor > 0`, mis. `1 roll = 5000 cm`), biaya modal per satuan pakai (`average_unit_cost`), dan batas stok minimum opsional (`TBD-22`). | BR-010 | TBD-03B, TBD-22 |
+| FR-PACK-002 | Sistem mengelola Master Standar Ukuran Paket secara dinamis (`XS`, `S`, `M`, `L`, `XL`, `XXL`, dll.) beserta komposisi materialnya. | Pengelola dapat menambah, mengubah, mengurutkan, atau menonaktifkan kategori ukuran paket beserta dimensi acuannya (mis. `XS: 15 × 10 × 8 cm`, `S: 20 × 15 × 10 cm`, dst.) pada `PackageSizes`, serta mengatur daftar material penyusun dan takaran pakai standarnya dalam satuan pakai (`PackageSizeItems.default_usage_qty`). Komposisi material dan takaran per ukuran dapat ditambah, dikurangi, atau disesuaikan sewaktu-waktu oleh pengelola. | BR-018, BR-021 |  |
+| FR-PACK-003 | Sistem mencatat pembelian perlengkapan kemasan sebagai persediaan. | Data berisi nomor unik (`purchase_number`), tanggal, jenis perlengkapan kemasan, jumlah beli (`Decimal(12,4)`), harga beli, dan total; saldo stok bertambah dalam satuan pakai (`purchase_qty × conversion_factor`) dan biaya modal rata-rata per satuan pakai (`average_unit_cost`) diperbarui; pembelian dicatat pada arus kas keluar saat dibayar dan tidak langsung menjadi HPP penjualan maupun pengeluaran operasional (mencegah hitung ganda). Mekanisme pembayaran tunai atau tempo mengikuti `TBD-15`. | BR-010 | TBD-03B, TBD-15 |
+| FR-PACK-004 | Sistem mencatat pemakaian perlengkapan kemasan berbasis Standar Ukuran Paket per transaksi penjualan secara opsional dan mengizinkan penyesuaian aktual. | Pemilihan standar ukuran paket kemasan bersifat opsional (pesanan dapat disimpan dan diproses tanpa memilih paket kemasan). Jika paket kemasan dipilih pada transaksi (`Sales.package_size_id`), sistem otomatis memuat daftar material dari `PackageSizeItems` (`standard_usage_qty`) yang kuantitas pemakaian aktualnya (`actual_usage_qty`) dapat disesuaikan per material oleh pengelola saat transaksi. Saat pesanan berstatus `Diproses` (atau langsung disimpan sebagai `Diproses`/`Selesai`), saldo stok tiap material berkurang sebesar `actual_usage_qty` dalam transaksi atomik dengan menandai `SalePackagingUsages.is_stock_deducted = true`; validasi stok tidak mencukupi mengikuti `TBD-09`; pemakaian terhubung ke nomor transaksi. | BR-011, BR-021 | TBD-09 |
+| FR-PACK-005 | Sistem menghitung HPP kemasan per paket secara terpisah dari FIFO produk dan mendukung penyesuaian manual. | Sistem menghitung estimasi biaya kemasan per paket berdasarkan kuantitas pakai aktual tiap material dan biaya modal satuan pakai (`calculated_hpp = ROUND(SUM(actual_usage_qty × unit_cost_snapshot))`). Pengguna dapat menyesuaikan nominal HPP kemasan per paket jika diperlukan (`adjusted_hpp`). Sistem menyimpan nilai hasil perhitungan (`calculated_hpp`) dan nilai hasil penyesuaian (`adjusted_hpp`) secara terpisah; nilai final diakui sebagai HPP kemasan pada transaksi. | BR-011, BR-021 | TBD-03B |
+| FR-PACK-006 | Sistem menampilkan saldo stok dan mutasi pergerakan perlengkapan kemasan. | Setiap pembelian, pemakaian transaksi, pengembalian pembatalan (`TBD-11`), dan penyesuaian membuat satu catatan pada `PackagingMovements` dalam transaksi atomik; stok awal, masuk, keluar, dan akhir dapat ditelusuri per periode. | BR-010 |  |
+| FR-PACK-007 | Sistem menyediakan penyesuaian stok perlengkapan kemasan manual. | Data berisi kuantitas (`Decimal(12,4)` dalam satuan pakai), waktu, pengguna, dan alasan opsional; validasi stok negatif mengikuti `TBD-09`. | BR-010 | TBD-09 |
+| FR-PACK-008 | Sistem memberi peringatan stok perlengkapan kemasan rendah. | Perlengkapan kemasan dengan stok di bawah atau sama dengan batas minimum diberi penanda visual dan tampil di dashboard. | BR-010, BR-012 | TBD-22 |
+| FR-PACK-009 | Sistem menampilkan riwayat pemakaian perlengkapan kemasan. | Daftar dapat disaring menurut tanggal, standar ukuran paket, jenis perlengkapan kemasan, dan nomor transaksi; dari detail transaksi terlihat rincian ukuran paket, material terpakai (`standard_usage_qty` vs `actual_usage_qty`), nilai `calculated_hpp`, dan `adjusted_hpp`. | BR-010, BR-021 |  |
 
 ### 3.8 Modul Dashboard
 
-Semua angka dashboard mengikuti rumus di BRD bagian 5 dan dapat difilter menurut periode (hari ini, 7 hari, bulan ini, rentang bebas).
+Semua metrik pada dashboard mengikuti rumus pada BRD v0.8 Bagian 5 dan mendukung filter periode (hari ini, 7 hari terakhir, bulan ini, rentang tanggal bebas).
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-DASH-001 | Dashboard menampilkan ringkasan penjualan. | Menampilkan penjualan neto dan jumlah transaksi pada periode terpilih; transaksi dibatalkan tidak dihitung; angka sama dengan laporan penjualan periode yang sama. | BR-012 |  |
-| FR-DASH-002 | Dashboard menampilkan total pengeluaran operasional. | Hanya pengeluaran operasional yang tidak di-void; tidak termasuk pembelian kemasan. | BR-012 |  |
-| FR-DASH-003 | Dashboard menampilkan ringkasan keuntungan. | Menampilkan laba kotor dan laba bersih sesuai rumus BRD; angka sama dengan laporan keuntungan. | BR-012 | TBD-03, TBD-04, TBD-06 |
-| FR-DASH-004 | Dashboard menampilkan informasi stok produk dan kemasan. | Menampilkan daftar varian dan bahan yang stoknya di bawah atau sama dengan batas minimum; dapat dibuka ke detail. | BR-012, BR-016 | TBD-22 |
-| FR-DASH-005 | Dashboard menampilkan pembelian dan tagihan supplier. | Menampilkan total pembelian periode, total sisa tagihan, dan daftar tagihan terlambat. | BR-020 | TBD-17 |
-| FR-DASH-006 | Dashboard menampilkan transaksi yang belum selesai. | Menampilkan pesanan berstatus diproses, pembayaran belum dibayar, dan pencairan belum cair atau sebagian. | BR-012 | TBD-14 |
-| FR-DASH-007 | Dashboard menampilkan ringkasan arus kas. | Menampilkan kas masuk dan kas keluar periode terpilih menurut tanggal terima dan tanggal bayar. | BR-020 |  |
+| FR-DASH-001 | Dashboard menampilkan ringkasan penjualan dan Pemasukan Bersih. | Menampilkan **Pemasukan Bersih (Penjualan Neto)** = `Total transaksi − refund pelanggan − biaya admin marketplace` (memakai `admin_fee_actual_amount` apabila `IS NOT NULL`, atau estimasi 22% untuk transaksi marketplace apabila `admin_fee_actual_amount IS NULL`) serta jumlah transaksi aktif pada periode terpilih; transaksi dibatalkan dikecualikan; angka identik dengan laporan penjualan periode yang sama. | BR-012, BR-019 |  |
+| FR-DASH-002 | Dashboard menampilkan total pengeluaran operasional. | Hanya menjumlahkan pengeluaran operasional berstatus aktif (tidak di-void); tidak mencakup pembelian perlengkapan kemasan maupun potongan biaya admin marketplace. | BR-012 |  |
+| FR-DASH-003 | Dashboard menampilkan ringkasan keuntungan usaha. | Menampilkan **Laba Kotor** (`Pemasukan Bersih − HPP Produk FIFO − HPP Kemasan`) dan **Laba Bersih** (`Laba Kotor − Pengeluaran Operasional − Penghapusan Persediaan`) sesuai rumus BRD v0.8; angka identik dengan laporan keuntungan. | BR-012 | TBD-03B |
+| FR-DASH-004 | Dashboard menampilkan peringatan stok produk dan perlengkapan kemasan rendah. | Menampilkan daftar varian produk dan perlengkapan kemasan dengan saldo stok di bawah atau sama dengan batas minimum beserta tautan ke detailnya. | BR-012, BR-016 | TBD-22 |
+| FR-DASH-005 | Dashboard menampilkan ringkasan pembelian dan utang supplier. | Menampilkan total pembelian periode, total sisa tagihan belum lunas, dan daftar tagihan yang melewati tanggal jatuh tempo. | BR-020 | TBD-17 |
+| FR-DASH-006 | Dashboard menampilkan daftar transaksi yang belum selesai. | Menampilkan pesanan berstatus `Baru` atau `Diproses`, transaksi berstatus pembayaran `Belum dibayar`, dan transaksi marketplace berstatus pencairan `Belum cair` atau `Sebagian cair`. | BR-012 | TBD-14 |
+| FR-DASH-007 | Dashboard menampilkan ringkasan arus kas. | Menampilkan total kas masuk dan kas keluar pada periode terpilih berdasarkan tanggal dana diterima dan tanggal dibayar. | BR-020 |  |
 
 ### 3.9 Modul Riwayat
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-HIST-001 | Sistem menampilkan riwayat penjualan. | Daftar dan detail transaksi; pencarian nomor atau resi; filter tanggal, kanal, dan status; menampilkan pembuat transaksi. | BR-002, BR-014 |  |
-| FR-HIST-002 | Sistem menampilkan riwayat pembelian dan penerimaan barang. | Daftar pembelian dengan penerimaannya; filter supplier, tanggal, dan status. | BR-007 |  |
-| FR-HIST-003 | Sistem menampilkan riwayat pembayaran. | Pembayaran supplier, pembayaran penjualan, dan pencairan dana marketplace tampil dengan tanggal, nominal, dan pengguna; yang di-void ditandai. | BR-008, BR-014 |  |
-| FR-HIST-004 | Sistem menampilkan riwayat retur. | Retur pelanggan dan supplier dalam satu halaman dengan filter jenis dan tanggal. | BR-009 |  |
-| FR-HIST-005 | Sistem menampilkan riwayat perubahan stok produk. | Setiap catatan menampilkan jenis, jumlah, saldo, referensi, pengguna, dan waktu. | BR-014, BR-016 |  |
-| FR-HIST-006 | Sistem menampilkan riwayat perubahan stok kemasan. | Setiap catatan menampilkan jenis, jumlah, saldo, referensi, pengguna, dan waktu. | BR-014 |  |
-| FR-HIST-007 | Sistem menampilkan riwayat status transaksi. | Setiap perubahan status pesanan, pembayaran, dan pencairan tampil beserta waktu dan pengguna. | BR-002, BR-014 |  |
-| FR-HIST-008 | Sistem menampilkan riwayat aktivitas pengguna. | Aktivitas penting dapat disaring menurut pengguna, jenis aktivitas, dan tanggal; data tetap ada setelah akun dinonaktifkan. | BR-014 |  |
+| FR-HIST-001 | Sistem menampilkan riwayat transaksi penjualan. | Daftar dan detail transaksi; pencarian nomor transaksi atau nomor resi; filter tanggal, kanal, dan kelompok status; menampilkan pengguna pembuat transaksi dan rincian standar ukuran paket kemasan. | BR-002, BR-014 |  |
+| FR-HIST-002 | Sistem menampilkan riwayat pembelian dan penerimaan barang. | Daftar pembelian beserta rincian setiap penerimaan bertahapnya; filter supplier, tanggal, dan status pembelian/pembayaran. | BR-007 |  |
+| FR-HIST-003 | Sistem menampilkan riwayat pembayaran dan pencairan dana. | Pembayaran supplier, pembayaran penjualan, dan pencairan dana marketplace tampil lengkap dengan tanggal, nominal, metode, dan pelaku; catatan void ditandai jelas. | BR-008, BR-014 |  |
+| FR-HIST-004 | Sistem menampilkan riwayat retur pelanggan dan supplier. | Menampilkan seluruh transaksi retur dalam satu modul riwayat dengan filter jenis retur, kondisi, status, dan rentang tanggal. | BR-009 |  |
+| FR-HIST-005 | Sistem menampilkan riwayat mutasi stok produk dan batch FIFO. | Setiap catatan mutasi menampilkan `stock_pool` (`SELLABLE`/`DAMAGED`), jenis mutasi, jumlah perubahan, referensi batch FIFO (termasuk peristiwa pemulihan alokasi pada `SaleItemBatchAllocationReversals`), nomor dokumen referensi yang terbaca manusia, pelaku, dan waktu. | BR-014, BR-016 |  |
+| FR-HIST-006 | Sistem menampilkan riwayat mutasi stok perlengkapan kemasan. | Setiap catatan mutasi menampilkan jenis mutasi, jumlah perubahan (dalam satuan pakai), nomor dokumen referensi, pelaku, dan waktu. | BR-014 |  |
+| FR-HIST-007 | Sistem menampilkan riwayat perubahan status transaksi dan retur. | Setiap perpindahan status pesanan (`Baru`, `Diproses`, `Selesai`, `Dibatalkan`), pembayaran, pencairan, serta status klaim/dana retur tersimpan beserta waktu, alasan/catatan, dan pelaku. | BR-002, BR-009, BR-014 |  |
+| FR-HIST-008 | Sistem menampilkan log aktivitas pengguna. | Aktivitas penting dapat disaring menurut pengguna, jenis aktivitas, dan rentang tanggal; riwayat tetap utuh meski akun dinonaktifkan. | BR-014 |  |
 
 ### 3.10 Modul Laporan
 
-Semua laporan memakai filter periode (harian, bulanan, rentang bebas) dan data historis sesuai waktu transaksi.
+Semua laporan mendukung filter periode (harian, bulanan, rentang tanggal bebas) dan mengacu pada nilai historis saat transaksi terjadi.
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-REPORT-001 | Laporan penjualan. | Menampilkan jumlah transaksi, penjualan neto, dan item terjual menurut periode dan kanal; transaksi dibatalkan tidak dihitung. | BR-012 | TBD-23 |
-| FR-REPORT-002 | Laporan pembelian. | Menampilkan total pembelian, rincian item, supplier, dan status pembayaran menurut periode dan supplier. | BR-012 | TBD-23 |
-| FR-REPORT-003 | Laporan pengeluaran operasional. | Menampilkan total per kategori menurut periode; pengeluaran void tidak dihitung; pembelian kemasan tidak muncul di sini. | BR-012, BR-017 | TBD-23 |
-| FR-REPORT-004 | Laporan persediaan produk. | Menampilkan stok dan nilai persediaan per varian (stok × HPP), stok rusak, dan varian stok rendah. | BR-012 | TBD-03 |
-| FR-REPORT-005 | Laporan persediaan kemasan. | Menampilkan stok awal, pembelian, pemakaian, stok akhir, dan nilainya per bahan. | BR-012 | TBD-03 |
-| FR-REPORT-006 | Laporan HPP. | Menampilkan HPP barang dan biaya kemasan terpisah per periode dan per transaksi dari snapshot. | BR-011, BR-012 | TBD-03 |
-| FR-REPORT-007 | Laporan keuntungan. | Menampilkan penjualan neto, HPP barang, biaya kemasan, laba kotor, biaya marketplace, pengeluaran operasional, penghapusan persediaan, dan laba bersih sesuai rumus BRD; rumus tertulis di laporan. | BR-011, BR-012, BR-019 | TBD-03, TBD-04, TBD-06 |
-| FR-REPORT-008 | Laporan pembayaran dan utang supplier. | Menampilkan total pembelian, total dibayar, sisa tagihan, dan tagihan terlambat per supplier. | BR-020 | TBD-17 |
-| FR-REPORT-009 | Laporan retur. | Menampilkan retur pelanggan dan supplier menurut kondisi, status klaim, status dana, dan nilai refund. | BR-009, BR-012 | TBD-06 |
-| FR-REPORT-010 | Laporan arus kas. | Menampilkan kas masuk (penjualan offline dan dana marketplace yang cair) dan kas keluar (pembayaran supplier, pembelian kemasan, pengeluaran operasional, refund) menurut tanggal terjadi; pembelian tempo baru muncul saat dibayar. | BR-020 | TBD-14, TBD-15 |
-| FR-REPORT-011 | Laporan dapat diekspor dan dicetak. | Setiap laporan dapat diunduh sebagai CSV dan dicetak lewat browser; angka ekspor sama dengan tampilan. | BR-012 | TBD-23 |
+| FR-REPORT-001 | Laporan penjualan dan Pemasukan Bersih. | Menampilkan jumlah transaksi, Penjualan Bruto, potongan refund pelanggan, potongan biaya admin marketplace (`admin_fee_actual_amount` apabila `IS NOT NULL`, atau estimasi 22% untuk transaksi marketplace apabila `IS NULL`), **Pemasukan Bersih (Penjualan Neto)**, dan kuantitas item terjual per periode dan kanal; transaksi dibatalkan tidak dihitung. | BR-012, BR-019 | TBD-23 |
+| FR-REPORT-002 | Laporan pembelian barang. | Menampilkan total pembelian, perbandingan kuantitas dipesan vs diterima, rincian item, supplier, dan status pembayaran per periode dan supplier. | BR-012 | TBD-23 |
+| FR-REPORT-003 | Laporan pengeluaran operasional. | Menampilkan rincian pengeluaran per kategori dan total periode; catatan void dikecualikan; pembelian perlengkapan kemasan dan potongan biaya admin marketplace tidak masuk laporan ini. | BR-012, BR-017 | TBD-23 |
+| FR-REPORT-004 | Laporan persediaan produk (FIFO). | Menampilkan saldo stok layak jual dan nilai persediaan per varian berdasarkan sisa tiap lapisan FIFO (`remaining_qty × unit_cost`), saldo stok rusak (`damaged_stock_qty`), serta penanda stok rendah. | BR-012 |  |
+| FR-REPORT-005 | Laporan persediaan perlengkapan kemasan. | Menampilkan stok awal, pembelian masuk, pemakaian keluar, stok akhir (dalam satuan pakai), dan nilai persediaannya per jenis perlengkapan kemasan. | BR-012 | TBD-03B |
+| FR-REPORT-006 | Laporan HPP produk dan perlengkapan kemasan. | Menampilkan rincian HPP produk (dihitung dari alokasi batch FIFO neto `allocated_qty - reversed_qty`) dan HPP kemasan per paket secara terpisah per periode dan per transaksi berdasarkan snapshot historis. | BR-011, BR-012, BR-021 |  |
+| FR-REPORT-007 | Laporan keuntungan usaha (Laba Rugi). | Menampilkan Penjualan Bruto, potongan refund, biaya admin marketplace (`admin_fee_actual_amount` apabila `IS NOT NULL`, atau estimasi 22% untuk marketplace apabila `IS NULL`, tanpa menjumlahkan keduanya), **Pemasukan Bersih** (`Penjualan Bruto − Refund − Biaya Admin Marketplace`), HPP produk (FIFO), HPP kemasan, **Laba Kotor** (`Pemasukan Bersih − HPP Produk − HPP Kemasan`), pengeluaran operasional, penghapusan persediaan, dan **Laba Bersih** (`Laba Kotor − Pengeluaran Operasional − Penghapusan Persediaan`) sesuai rumus BRD v0.8; rumus perhitungan dicantumkan pada tampilan laporan. | BR-011, BR-012, BR-019 |  |
+| FR-REPORT-008 | Laporan pembayaran dan utang supplier. | Menampilkan total nilai pembelian, total telah dibayar (dikurangi void dan potongan tagihan retur supplier), sisa utang, dan daftar tagihan terlambat per supplier. | BR-020 | TBD-17 |
+| FR-REPORT-009 | Laporan retur barang. | Menampilkan rekap retur pelanggan dan retur supplier berdasarkan kondisi barang, status klaim, status dana, nilai refund, dan penyelesaian retur supplier. | BR-009, BR-012 |  |
+| FR-REPORT-010 | Laporan arus kas. | Menampilkan arus kas masuk (pembayaran penjualan offline aktif, pencairan dana marketplace aktif berdasarkan tanggal diterima, dan pengembalian uang tunai/transfer dari retur supplier berdasarkan `settlement_date`) dan arus kas keluar (pembayaran supplier aktif, pembelian perlengkapan kemasan, pengeluaran operasional aktif, serta refund pelanggan berdasarkan `refund_paid_date`); pembelian tempo baru dicatat saat pembayaran dilakukan; pembelian persediaan tidak dihitung ganda dengan HPP. | BR-020 | TBD-14, TBD-15 |
+| FR-REPORT-011 | Ekspor CSV dan cetak laporan. | Setiap laporan dapat diunduh sebagai file CSV dan dicetak melalui browser dengan angka yang identik dengan tampilan layar. | BR-012 | TBD-23 |
 
 ### 3.11 Modul Pengaturan Sistem
 
 | ID | Requirement | Kriteria penerimaan | BR | TBD |
 | --- | --- | --- | --- | --- |
-| FR-SET-001 | Pengaturan informasi usaha. | Nama, alamat, dan telepon usaha dapat diubah dan tampil di nota. | BR-018 |  |
-| FR-SET-002 | Pengelolaan satuan. | Satuan produk dan kemasan dapat ditambah dan dinonaktifkan; satuan yang dipakai tidak dapat dihapus. | BR-018 | TBD-02 |
-| FR-SET-003 | Pengelolaan kanal penjualan. | Kanal dapat ditambah, diubah, dan dinonaktifkan; kanal yang dipakai transaksi tidak dihapus permanen. | BR-018 | TBD-20 |
-| FR-SET-004 | Pengelolaan kategori produk dan pengeluaran. | Kategori dapat ditambah, diubah nama, dan dinonaktifkan; riwayat tetap memakai kategori lama. | BR-018 | TBD-21 |
-| FR-SET-005 | Pengaturan batas stok minimum. | Batas diisi per varian dan per bahan kemasan; perubahan langsung memengaruhi peringatan. | BR-016, BR-018 | TBD-22 |
-| FR-SET-006 | Pengaturan operasional lainnya. | Durasi sesi dan format nota dapat diatur; pengaturan lain ditambahkan hanya setelah disepakati. | BR-018 | TBD-24 |
+| FR-SET-001 | Pengaturan identitas usaha. | Nama usaha, alamat, dan nomor telepon dapat diperbarui dan otomatis ditampilkan pada nota transaksi serta kop laporan. | BR-018 |  |
+| FR-SET-002 | Pengelolaan master satuan produk dan perlengkapan kemasan. | Satuan dapat ditambah, dikonfigurasi aturan desimalnya (`allow_decimal`, `decimal_places`), dan dinonaktifkan; satuan yang sudah digunakan oleh varian atau perlengkapan kemasan dilarang dihapus permanen. | BR-018 | TBD-02 |
+| FR-SET-003 | Pengelolaan kanal penjualan dan marketplace. | Pengelola dapat menambah, mengubah nama, menandai tipe kanal (`is_marketplace` untuk menentukan keberlakuan otomatis estimasi biaya admin 22%), dan menonaktifkan kanal penjualan; kanal yang memiliki riwayat transaksi hanya dapat dinonaktifkan. | BR-018, BR-019 | TBD-20 |
+| FR-SET-004 | Pengelolaan kategori produk dan kategori pengeluaran. | Kedua jenis kategori dapat ditambah, diubah nama, dan dinonaktifkan; data historis tetap mempertahankan kategori yang tercatat saat transaksi dibuat. | BR-018 | TBD-21 |
+| FR-SET-005 | Pengaturan batas stok minimum. | Pengelola dapat menentukan batas stok minimum per varian produk dan per perlengkapan kemasan untuk memicu peringatan stok rendah. | BR-016, BR-018 | TBD-22 |
+| FR-SET-006 | Pengaturan parameter operasional, default estimasi biaya admin marketplace, master Standar Ukuran Paket, dan pemantauan status pencadangan lokal. | Menyediakan konfigurasi persentase default estimasi biaya admin marketplace dengan nilai awal **22%**, durasi timeout sesi tidak aktif, format nota, serta pengelolaan master **Standar Ukuran Paket** (`PackageSizes` dan `PackageSizeItems`, contoh awal `XS`–`XXL`); perubahan persentase default maupun komposisi ukuran paket hanya berlaku untuk transaksi baru dan tidak mengubah nilai pada transaksi historis. Menampilkan status pencadangan terakhir (`SUCCESS`, `FAILED`, atau `MISSED`/`OVERDUE` apabila tidak ada backup sukses melewati jadwal harian terakhir saat server dinyalakan kembali) beserta waktu eksekusi sukses terakhir. | BR-018, BR-019, BR-021 |  |
+
+### 3.12 Spesifikasi Alur Utama, Validasi, dan Kondisi Alternatif per Kelompok Modul
+
+1. **Autentikasi & Sesi (`FR-AUTH`):**
+   - *Aktor:* Pengelola 1 dan Pengelola 2 (`PENGELOLA`).
+   - *Alur Utama:* Pengguna membuka URL server lokal di LAN $\rightarrow$ memasukkan username & password $\rightarrow$ server memverifikasi hash password & status `is_active = true` $\rightarrow$ membuat baris sesi di `Sessions` dan menyimpan HTTP-only cookie $\rightarrow$ redirect ke `/dashboard`.
+   - *Validasi & Kondisi Alternatif:* Kredensial salah atau akun nonaktif mengembalikan pesan generik tanpa membocorkan eksistensi username; permintaan ke rute internal tanpa cookie sesi valid diarahkan ke `/login` (atau `401` pada API).
+2. **Pembelian, Penerimaan Bertahap, dan Retur Supplier (`FR-PUR` & `FR-PROD-005..006`):**
+   - *Aktor:* Pengelola.
+   - *Alur Utama:* Buat PO (`Draf` $\rightarrow$ `Dikonfirmasi`) $\rightarrow$ catat penerimaan barang (`GoodsReceipts`) untuk sebagian/seluruh item $\rightarrow$ dalam transaksi atomik ber-lock, sistem memperbarui `PurchaseItems.received_qty`, status PO (`Diterima sebagian`/`Diterima seluruhnya`), menambah `ProductVariants.stock_qty`, membuat 1 lapisan baru pada `StockBatches` (`source_type = PURCHASE_RECEIPT`, `unit_cost = PurchaseItems.unit_price`), dan mencatat mutasi `StockMovements` (`stock_pool = SELLABLE`, `batch_id` terisi).
+   - *Validasi & Kondisi Alternatif:* Kuantitas terima melebihi sisa pesanan (`ordered_qty - received_qty`) ditolak; PO yang sudah memiliki penerimaan tidak dapat dibatalkan langsung dan dikoreksi melalui `SupplierReturns` (nilai otomatis `SUM(SupplierReturnItems.subtotal)` atau disesuaikan manual sebelum simpan, memotong `remaining_qty` batch penerimaan asal, dan mengurangi `Purchases.remaining_amount` untuk `POTONGAN_TAGIHAN`, dicatat ke kas masuk pada `settlement_date` untuk `PENGEMBALIAN_UANG`, atau membentuk batch baru `SUPPLIER_REPLACEMENT` saat barang pengganti tiba).
+3. **Penjualan, Pemrosesan FIFO Konkuren, Kemasan Ukuran Paket, Pembatalan, dan Retur (`FR-SALE`, `FR-PACK`, & `FR-RET`):**
+   - *Aktor:* Pengelola.
+   - *Alur Utama:* Catat pesanan (`Baru`, stok belum dipotong; `Sales.subtotal_amount = SUM(SaleItems.subtotal_amount)` setelah diskon item; `Sales.total_amount = Sales.subtotal_amount − Sales.discount_amount + Sales.additional_fee_amount`; estimasi admin marketplace = 22% dari `Sales.subtotal_amount − Sales.discount_amount` jika `SalesChannels.is_marketplace = true`; pilih opsional standar ukuran paket `PackageSizes` dan sesuaikan `actual_usage_qty` / `adjusted_hpp` bila diperlukan) $\rightarrow$ ubah status ke `Diproses` $\rightarrow$ dalam transaksi atomik, sistem mengunci baris `ProductVariants` (`FOR UPDATE`, diurutkan berdasarkan `variant_id ASC` untuk mencegah *deadlock*) serta `StockBatches` tertua (`ORDER BY received_at ASC, id ASC`), mencatat pemakaian tiap batch di `SaleItemBatchAllocations`, mencatat 1 baris `StockMovements` per batch yang terpotong (`stock_pool = SELLABLE`), mengunci `total_hpp_fifo`, memotong `ProductVariants.stock_qty` serta `PackagingMaterials.stock_qty` sesuai `actual_usage_qty` (jika kemasan dipilih, menandai `SalePackagingUsages.is_stock_deducted = true` dan mencatat `PackagingMovements`), dan menandai `Sales.is_stock_deducted = true`.
+   - *Kondisi Alternatif:*
+     - Jika dua pengelola memproses penjualan varian yang sama pada waktu bersamaan, transaksi kedua menunggu hingga lock baris varian dari transaksi pertama selesai (*commit*/*rollback*) sebelum membaca `remaining_qty` terbaru.
+     - Jika `Baru → Dibatalkan`: status berubah tanpa mutasi stok.
+     - Jika `Diproses → Dibatalkan`: dalam transaksi atomik ber-lock, memulihkan sisa alokasi (`allocated_qty - reversed_qty`) ke `StockBatches` asal, memperbarui `reversed_qty`, mencatat peristiwa pada `SaleItemBatchAllocationReversals` (`CANCELLATION`, `sale_status_history_id`), dan mencatat 1 baris `StockMovements` per batch yang dipulihkan (`stock_pool = SELLABLE`).
+     - Jika `Selesai → Dibatalkan`: sistem menolak perubahan status dan mengarahkan pengguna ke modul Retur Pelanggan.
+     - Jika Retur Pelanggan `Layak jual` (dengan referensi transaksi): memulihkan batch asal dengan aturan *Last-Allocated, First-Restored*, mencatat `SaleItemBatchAllocationReversals` (`CUSTOMER_RETURN`, `customer_return_item_id`), mengunci `restored_hpp_amount`, dan mencatat 1 baris `StockMovements` per batch yang dipulihkan (`stock_pool = SELLABLE`). Jika `Rusak`: menambah `damaged_stock_qty` dan mencatat `StockMovements` (`stock_pool = DAMAGED`, `batch_id = NULL`).
+4. **Pencadangan, Deteksi Jadwal Terlewat, dan Pemulihan Database Lokal (`NFR-012` & `FR-SET-006`):**
+   - *Aktor:* Penjadwal Sistem Operasi (Task Scheduler / Cron), Pemeriksa Startup Aplikasi, dan Pengelola.
+   - *Alur Utama:* Setiap hari pada jadwal yang dikonfigurasi saat server menyala, skrip sistem menjalankan `pg_dump` ke jalur perangkat penyimpanan fisik terpisah $\rightarrow$ memeriksa kode keluar (*exit code*) $\rightarrow$ menulis timestamp, nama file, ukuran file, dan status (`SUCCESS` atau `FAILED` jika `pg_dump` gagal / disk penuh / media terlepas) ke file log backup terstruktur.
+   - *Kondisi Alternatif (Server Mati Saat Jadwal Backup):* Ketika komputer server dalam keadaan mati pada jam jadwal harian, tidak ada skrip yang berjalan. Begitu server dinyalakan kembali dan layanan aplikasi aktif (atau halaman pengaturan dibuka), pemeriksa status backup membandingkan waktu saat ini dengan timestamp `SUCCESS` terakhir pada log. Jika melewati batas jadwal harian terakhir (lebih dari 24 jam tanpa `SUCCESS`), aplikasi menetapkan status pemantauan sebagai **`MISSED` / `OVERDUE`** dan menampilkan peringatan agar pengelola mengetahui ada jadwal backup yang terlewat akibat server mati.
 
 ## 4. Kebutuhan Nonfungsional
 
-Angka target bersifat usulan dan dapat diubah setelah klien menyebutkan volume dan perangkat sebenarnya (TBD-24).
-
 | ID | Aspek | Kebutuhan terukur |
 | --- | --- | --- |
-| NFR-001 | Autentikasi | Semua halaman dan data internal hanya dapat diakses setelah login. |
-| NFR-002 | Keamanan password | Password disimpan dengan hash modern (misalnya bcrypt atau argon2), tidak pernah sebagai teks biasa atau dicatat di log. |
-| NFR-003 | Otorisasi | Pemeriksaan akses dilakukan di server pada setiap permintaan, bukan hanya di antarmuka. |
-| NFR-004 | Kinerja | Untuk data hingga 10.000 transaksi: halaman utama dan kasir terbuka di bawah 2 detik; pencarian produk menampilkan hasil di bawah 1 detik; laporan bulanan tampil di bawah 5 detik. |
-| NFR-005 | Konsistensi data | Operasi yang saling terkait (penjualan, stok, kemasan, HPP) berhasil seluruhnya atau dibatalkan seluruhnya; saldo stok selalu sama dengan jumlah catatan pergerakannya. |
-| NFR-006 | Pencegahan transaksi ganda | Mengirim formulir dua kali (klik ganda atau muat ulang) tidak membuat dua transaksi. |
-| NFR-007 | Kompatibilitas | Berfungsi di Chrome terbaru pada laptop atau PC dan Android; tata letak kasir dapat dipakai di layar 360 piksel ke atas. |
-| NFR-008 | Kemudahan penggunaan | Label formulir jelas, pesan kesalahan berbahasa Indonesia dan menyebut cara memperbaiki; pencatatan penjualan offline dapat diselesaikan dalam kurang dari 6 langkah layar. |
-| NFR-009 | Integritas riwayat | Data yang sudah dipakai transaksi tetap dapat ditelusuri walaupun produk, supplier, kanal, atau akun dinonaktifkan. |
-| NFR-010 | Validasi data | Sistem menolak nilai kosong yang wajib, kuantitas nol atau negatif, dan nominal tidak valid dengan pesan yang jelas. |
-| NFR-011 | Pemeliharaan | Penambahan fitur tidak mengubah data historis; perubahan skema dilakukan lewat migrasi. |
-| NFR-012 | Pencadangan data (usulan baru) | Data dicadangkan otomatis setiap hari dan dapat dipulihkan; belum pernah dibahas dengan klien. |
+| NFR-001 | Autentikasi | Seluruh rute halaman internal dan endpoint API operasional hanya dapat diakses setelah autentikasi valid. |
+| NFR-002 | Keamanan kredensial | Password disimpan menggunakan algoritma hash modern (`bcrypt` atau `argon2`), tidak pernah disimpan sebagai teks biasa atau dicatat di log; kredensial database hanya disimpan pada file `.env` di server lokal. |
+| NFR-003 | Otorisasi server-side | Validasi sesi database dan role `PENGELOLA` wajib dijalankan di sisi server pada setiap permintaan dari perangkat mana pun di jaringan LAN. |
+| NFR-004 | Kinerja jaringan lokal | Untuk volume hingga 10.000 transaksi melalui jaringan Wi-Fi lokal (LAN): halaman utama dan kasir terbuka dalam waktu kurang dari 2 detik; pencarian produk/barcode kurang dari 1 detik; laporan bulanan tampil kurang dari 5 detik. |
+| NFR-005 | Konsistensi data, FIFO, & rekonsiliasi buku besar stok | Pemrosesan pesanan, pemotongan batch FIFO, pengurangan/pemulihan stok kemasan, pemulihan alokasi (`SaleItemBatchAllocationReversals`), penghapusan stok aktif, dan pencatatan mutasi (1 baris per batch terdampak untuk `SELLABLE`) wajib berjalan dalam transaksi database atomik dengan penguncian baris (`FOR UPDATE`); saldo `ProductVariants.stock_qty` konsisten dengan total sisa kuantitas seluruh `StockBatches` dan `SUM(StockMovements.qty_change)` untuk `stock_pool = SELLABLE`, sedangkan `damaged_stock_qty` konsisten dengan `SUM(StockMovements.qty_change)` untuk `stock_pool = DAMAGED`, serta dapat diverifikasi melalui fungsi rekonsiliasi stok. |
+| NFR-006 | Pencegahan transaksi, pemulihan ganda, & konflik konkuren | Pengiriman formulir dua kali (klik ganda atau muat ulang), pemicuan ulang transisi status, maupun pemrosesan penjualan bersamaan oleh dua pengelola tidak membuat duplikasi transaksi, pemotongan stok ganda, maupun pemulihan batch melebihi sisa alokasi. |
+| NFR-007 | Deployment lokal & akses LAN multi-perangkat | Aplikasi Next.js dan PostgreSQL di-hosting pada komputer server lokal milik usaha tanpa ketergantungan koneksi internet maupun server cloud eksternal; server dikonfigurasi mendengarkan antarmuka LAN (`0.0.0.0` pada IP statis LAN) sehingga dapat diakses melalui browser Chrome terbaru pada PC/laptop maupun HP Android dalam jaringan Wi-Fi lokal yang sama (tata letak kasir responsif mulai lebar layar 360 piksel ke atas). |
+| NFR-008 | Kemudahan penggunaan | Label formulir berbahasa Indonesia, validasi masukan memakai skema Zod dengan pesan kesalahan jelas yang menyebut cara memperbaiki; skrip peluncur lokal disediakan agar pengelola dapat menjalankan server tanpa perintah terminal manual. |
+| NFR-009 | Integritas riwayat | Data historis transaksi tetap dapat ditelusuri secara utuh meskipun produk, varian, supplier, kanal penjualan, kategori, standar ukuran paket, material kemasan, atau akun pengguna dinonaktifkan. |
+| NFR-010 | Validasi data & satuan | Sistem menolak nilai kosong yang wajib, kuantitas nol atau negatif, nominal tidak valid, serta jumlah angka desimal yang melanggar konfigurasi satuan pada `Units`. |
+| NFR-011 | Pemeliharaan | Penambahan fitur tidak mengubah data historis; perubahan skema database dikelola melalui migrasi Prisma. |
+| NFR-012 | Pencadangan, deteksi jadwal terlewat, & pemulihan database otomatis (Wajib) | Database PostgreSQL pada server lokal **wajib** dicadangkan secara otomatis setiap hari melalui penjadwalan sistem operasi menggunakan utilitas `pg_dump` dengan format nama file ber-timestamp (`bizmanage_YYYYMMDD_HHMMSS.dump`) tanpa perlu dijalankan manual oleh pengguna. File hasil backup **wajib** disimpan pada **perangkat penyimpanan fisik yang berbeda** dari media penyimpanan database utama (bukan sekadar direktori atau partisi berbeda pada disk yang sama). Ketika skrip berjalan saat server menyala, hasil eksekusi dicatat ke file log lokal dengan status `SUCCESS` atau `FAILED` (beserta pesan galat jika `pg_dump` gagal atau media penyimpanan tidak tersedia). Apabila server mati saat jadwal backup tiba sehingga skrip tidak berjalan, layanan pemeriksa saat server menyala kembali wajib mendeteksi keterlambatan berdasarkan timestamp `SUCCESS` terakhir dan menandai status sebagai **`MISSED` / `OVERDUE`** (tidak pernah melaporkan berhasil). Prosedur pemulihan (*recovery*) menggunakan `pg_restore` / `psql` wajib terdokumentasi dan diuji secara berkala **minimal 1 (satu) kali setiap bulan** serta setiap kali terjadi perubahan besar pada struktur database. |
 
 ## 5. Aturan Bisnis, Validasi, dan Koreksi Data
 
 ### 5.1 Aturan bisnis
 
-SRS memakai aturan bisnis BRULE-001 sampai BRULE-028 dari BRD v0.5 bagian 5 tanpa perubahan. Rumus laba, HPP, dan arus kas juga mengikuti BRD bagian 5.
+SRS v1.2 mengadopsi seluruh aturan bisnis **BRULE-001 sampai BRULE-030** dan **Prinsip perhitungan keuangan** dari **BRD BizManage v0.8 Bagian 5**:
+
+1. **Penjualan Bruto (Total Transaksi):** `Subtotal item neto − diskon transaksi + biaya tambahan dari pelanggan`, di mana `Subtotal item neto = SUM(ROUND(qty × unit_selling_price) − diskon per item)` sehingga diskon tidak pernah dihitung dua kali.
+2. **Biaya Admin Marketplace:** Untuk kanal dengan `SalesChannels.is_marketplace = true`, menggunakan **`admin_fee_actual_amount`** apabila **`IS NOT NULL`** (termasuk nilai `0`), atau **estimasi biaya admin** (`ROUND((Sales.subtotal_amount − Sales.discount_amount) × default_admin_fee_rate / 100)`, default **22%**) untuk transaksi baru apabila `admin_fee_actual_amount IS NULL`. Keduanya tidak pernah dijumlahkan dan perubahan persentase default tidak mengubah transaksi historis.
+3. **Pemasukan Bersih (Penjualan Neto):** `Total transaksi − refund kepada pelanggan − biaya admin marketplace aktif`
+4. **HPP Produk (FIFO):** `Jumlah (kuantitas × harga beli lapisan FIFO saat pesanan diproses) − HPP barang retur layak jual yang kembali ke stok`
+5. **HPP Kemasan:** `Jumlah (kuantitas pakai aktual tiap material × harga modal satuan pakai) dibulatkan ke Rupiah terdekat, atau nilai hasil penyesuaian manual per paket`
+6. **Laba Kotor:** `Pemasukan bersih − HPP produk (FIFO) − HPP kemasan`
+7. **Laba Bersih:** `Laba kotor − pengeluaran operasional − penghapusan persediaan`
+8. **Arus Kas Masuk:** Pembayaran penjualan offline aktif, dana marketplace aktif yang benar-benar cair (berdasarkan tanggal diterima), serta pengembalian uang tunai/transfer dari retur supplier (berdasarkan `settlement_date`).
+9. **Arus Kas Keluar:** Pembayaran supplier aktif, pembelian perlengkapan kemasan, pengeluaran operasional aktif, dan refund pelanggan (berdasarkan `refund_paid_date`).
 
 ### 5.2 Aturan validasi
 
-| ID | Aturan |
+| ID | Aturan validasi |
 | --- | --- |
-| VR-001 | Nomor transaksi penjualan dan pembelian unik. |
-| VR-002 | Barcode unik antarvarian. |
-| VR-003 | Kuantitas produk dan kemasan lebih dari nol dan sesuai satuan yang ditentukan. |
-| VR-004 | Pembayaran supplier tidak melebihi sisa tagihan. |
-| VR-005 | Setiap pembayaran terhubung ke satu pembelian; setiap penerimaan terhubung ke satu pembelian. |
-| VR-006 | Jumlah diterima tidak melebihi sisa jumlah pesanan. |
-| VR-007 | Jumlah retur tidak melebihi jumlah terjual dikurangi retur sebelumnya. |
-| VR-008 | Penjualan, pemakaian kemasan, dan penyesuaian tidak boleh membuat stok negatif. |
-| VR-009 | Data yang punya riwayat transaksi tidak dihapus permanen lewat proses operasional biasa. |
-| VR-010 | Nilai snapshot harga dan HPP pada transaksi tidak dapat diubah setelah disimpan. |
-| VR-011 | Laporan memakai data historis sesuai waktu transaksi, bukan harga terbaru. |
-| VR-012 | Diskon tidak membuat total transaksi negatif. |
+| VR-001 | Nomor referensi dokumen unik wajib dimiliki oleh transaksi penjualan (`transaction_number`), pembelian (`purchase_number`), penerimaan barang (`receipt_number`), retur pelanggan (`return_number`), retur supplier (`return_number`), pembelian kemasan (`purchase_number`), dan penghapusan stok (`writeoff_number`), dibangkitkan secara atomik melalui *PostgreSQL Sequence* agar bebas tabrakan konkuren. |
+| VR-002 | Barcode unik antarvarian (untuk nilai yang tidak null). |
+| VR-003 | Kuantitas produk dan perlengkapan kemasan lebih dari nol (kecuali `SalePackagingUsages.actual_usage_qty` yang bernilai `>= 0` apabila salah satu material pada paket tidak digunakan pada transaksi tertentu), bertipe `Decimal(12,4)`, dan jumlah digit desimalnya mematuhi konfigurasi satuan pada `Units`. |
+| VR-004 | Pembayaran supplier aktif tidak melebihi sisa tagihan pembelian. |
+| VR-005 | Setiap pembayaran supplier dan setiap penerimaan barang terhubung ke satu transaksi pembelian. |
+| VR-006 | Kuantitas diterima pada penerimaan barang tidak melebihi sisa pesanan (`jumlah dipesan − jumlah sudah diterima`). |
+| VR-007 | Kuantitas retur pelanggan tidak melebihi kuantitas terjual dikurangi kuantitas yang sudah diretur sebelumnya (`allocated_qty - reversed_qty`). |
+| VR-008 | Setiap lapisan stok wajib menjaga `StockBatches.remaining_qty >= 0` dan `remaining_qty <= initial_qty`. Validasi pencegahan stok negatif pada tingkat varian (`stock_qty >= 0`) dan perlengkapan kemasan mengikuti kebijakan sementara hingga `TBD-09` dikonfirmasi. |
+| VR-009 | Data master atau header transaksi yang memiliki riwayat transaksi tidak boleh dihapus permanen (ditegakkan melalui `is_active = false` dan `ON DELETE RESTRICT`). |
+| VR-010 | Nilai snapshot harga jual, alokasi batch HPP FIFO, dan HPP kemasan pada transaksi yang sudah diproses tidak dapat diubah langsung tanpa mekanisme koreksi resmi. |
+| VR-011 | Laporan memakai data historis sesuai waktu transaksi, bukan harga, komposisi paket, atau persentase default terbaru. |
+| VR-012 | Diskon per item tidak boleh melebihi nilai kotor baris (`ROUND(qty × unit_selling_price)`), dan diskon tingkat transaksi (`Sales.discount_amount`) tidak boleh melebihi `Sales.subtotal_amount` sehingga total transaksi tidak pernah bernilai negatif. |
+| VR-013 | Pembelian perlengkapan kemasan dan potongan biaya admin marketplace dilarang dicatat sebagai pengeluaran operasional. |
+| VR-014 | Persentase default estimasi biaya admin bernilai 0% sampai 100%, dan nominal biaya admin aktual tidak boleh negatif (`>= 0`). |
+| VR-015 | Total kuantitas pemulihan pada `SaleItemBatchAllocationReversals` untuk satu alokasi tidak boleh melebihi `allocated_qty` (`0 <= reversed_qty <= allocated_qty`). |
+| VR-016 | Pesanan berstatus `Selesai` tidak dapat diubah statusnya menjadi `Dibatalkan`; pengembalian barang wajib diproses melalui modul Retur Pelanggan. |
+| VR-017 | Setiap pembuatan `StockBatch` dari penyesuaian stok masuk (`ADJUSTMENT`) atau retur tanpa referensi (`RETUR_TANPA_REFERENSI`) wajib memiliki nilai `unit_cost >= 0`. |
+| VR-018 | Nilai `SupplierReturns.return_amount` bernilai non-negatif (`>= 0`); jika `resolution_type = POTONGAN_TAGIHAN`, nilai `return_amount` tidak boleh melebihi sisa tagihan pembelian (`Purchases.remaining_amount`). |
+| VR-019 | Nilai `CustomerReturns.refund_amount` untuk retur berreferensi tidak boleh melebihi total nilai neto item yang diretur setelah dikurangi diskon item dan proporsi diskon transaksi (`ROUND((SaleItems.subtotal_amount − proporsi_diskon_transaksi) × return_qty / SaleItems.qty)`). |
 
-### 5.3 Penanganan kesalahan dan koreksi
+### 5.3 Penanganan kesalahan, koreksi, dan rekonsiliasi stok
 
-1. Kesalahan input penjualan, pembelian, pembayaran, dan pengeluaran dikoreksi lewat pembatalan (void) atau penyesuaian dengan alasan wajib; catatan awal tetap terlihat.
-2. Void membuat catatan pembalik, bukan mengubah angka lama, sehingga laporan periode lampau dapat ditelusuri.
-3. Kedua pengelola berwenang melakukan koreksi; pelaku dan waktu tercatat (TBD-12).
-4. Data yang tidak lolos validasi ditolak dengan pesan yang menjelaskan bagian yang salah.
+1. Kesalahan pencatatan pembayaran supplier, pembayaran penjualan, pencairan dana marketplace, dan pengeluaran operasional dikoreksi melalui mekanisme **void** dengan alasan wajib; rekaman awal tetap disimpan dengan penanda void dan nilai agregat serta status terkait dihitung ulang.
+2. Pembatalan pesanan berstatus `Diproses` memulihkan seluruh sisa alokasi batch ke `StockBatch` asal, memperbarui `reversed_qty`, dan mencatat peristiwa pada `SaleItemBatchAllocationReversals` (`reversal_type = CANCELLATION`) tanpa menghapus baris `SaleItemBatchAllocations`.
+3. Otorisasi kedua pengelola untuk melakukan void/koreksi mengikuti asumsi sementara `TBD-12`.
+4. **Prosedur Rekonsiliasi Buku Besar Stok:** Sistem menyediakan utilitas rekonsiliasi stok (dapat dijalankan kapan saja dari menu produk/stok maupun saat pemeliharaan) yang memeriksa kesamaan saldo `ProductVariants.stock_qty` terhadap `SUM(StockBatches.remaining_qty)` dan `SUM(StockMovements.qty_change WHERE stock_pool = 'SELLABLE')`, serta `ProductVariants.damaged_stock_qty` terhadap `SUM(StockMovements.qty_change WHERE stock_pool = 'DAMAGED')`. Jika ditemukan selisih akibat gangguan eksternal, sistem menampilkan daftar varian terdampak dan lapisan mutasi terkait untuk ditindaklanjuti melalui penyesuaian stok berjejak.
 
-## 6. Rancangan Entitas Awal
+## 6. Rancangan Struktur Data Lengkap dan Standar Database (42 Entitas)
 
-Bagian ini adalah daftar entitas untuk persiapan ERD. Atribut, kunci, dan relasi final ditentukan pada tahap perancangan database setelah TBD-01, 03, 04, 06, dan 10 dikonfirmasi; ERD sebelum itu hanya berstatus draf.
+Bagian ini mendefinisikan struktur **42 entitas**, atribut, relasi, kardinalitas, dan aturan integritas database sebagai dasar penyusunan **ERD BizManage**. Entitas dan atribut yang masih bergantung pada 5 TBD pemblokir skema (Bagian 7) memiliki rancangan default yang siap pakai dan ditandai untuk penguncian migrasi final.
 
-| No. | Entitas | Fungsi | FR terkait |
-| --- | --- | --- | --- |
-| 1 | Users | Akun pengelola, status aktif | FR-AUTH |
-| 2 | Products | Produk utama | FR-PROD-001 |
-| 3 | ProductCategories | Kategori produk | FR-PROD-002, FR-SET-004 |
-| 4 | ProductVariants | Varian: barcode, satuan, harga, stok, HPP | FR-PROD-003, 004 |
-| 5 | VariantChannelPrices | Harga jual khusus per kanal | FR-SALE-013 |
-| 6 | Units | Satuan produk dan kemasan | FR-SET-002 |
-| 7 | Suppliers | Data supplier | FR-SUP-001 |
-| 8 | VariantSuppliers | Hubungan varian dan supplier (tingkat varian) | FR-PROD-007 |
-| 9 | PurchasePriceHistories | Riwayat harga beli per varian | FR-PROD-005 |
-| 10 | StockMovements | Pergerakan stok produk, termasuk stok rusak | FR-PROD-008, FR-RET-004 |
-| 11 | SalesChannels | Kanal penjualan | FR-SET-003 |
-| 12 | Sales | Transaksi penjualan, diskon, biaya tambahan, biaya marketplace | FR-SALE-001 sampai 007 |
-| 13 | SaleItems | Item penjualan dengan snapshot harga dan HPP | FR-SALE-012 |
-| 14 | SaleStatusHistories | Riwayat status pesanan, pembayaran, pencairan | FR-SALE-008 |
-| 15 | SalePayments | Pembayaran penjualan | FR-SALE-001 |
-| 16 | MarketplaceSettlements | Pencairan dana marketplace | FR-SALE-009 |
-| 17 | Purchases | Pembelian supplier dan status | FR-PUR-001, 002 |
-| 18 | PurchaseItems | Item pembelian | FR-PUR-001 |
-| 19 | GoodsReceipts | Penerimaan barang | FR-PUR-003 |
-| 20 | GoodsReceiptItems | Item yang diterima | FR-PUR-003 |
-| 21 | SupplierPayments | Pembayaran supplier, termasuk void | FR-PUR-006, 007 |
-| 22 | SupplierReturns | Retur ke supplier | FR-PUR-009 |
-| 23 | SupplierReturnItems | Item retur supplier | FR-PUR-009 |
-| 24 | CustomerReturns | Retur pelanggan, status klaim, status dana | FR-RET-001 sampai 007 |
-| 25 | CustomerReturnItems | Item retur dengan kondisi | FR-RET-002, 003 |
-| 26 | MarketplaceClaims | Klaim marketplace, terpisah dari dana | FR-RET-005 |
-| 27 | StockWriteOffs | Penghapusan stok rusak | FR-RET-008 |
-| 28 | PackagingMaterials | Bahan kemasan, satuan beli, satuan pakai, konversi | FR-PACK-001 |
-| 29 | PackagingPurchases | Pembelian kemasan (tunai) | FR-PACK-002 |
-| 30 | PackagingMovements | Pergerakan stok kemasan | FR-PACK-005, 006 |
-| 31 | SalePackagingUsages | Pemakaian kemasan per transaksi dengan biaya tersimpan | FR-PACK-003, 004 |
-| 32 | Expenses | Pengeluaran operasional, termasuk void | FR-EXP-001, 003 |
-| 33 | ExpenseCategories | Kategori pengeluaran | FR-EXP-002 |
-| 34 | BusinessSettings | Informasi dan pengaturan usaha | FR-SET-001, 006 |
-| 35 | ActivityLogs | Riwayat aktivitas pengguna | FR-AUTH-006, FR-HIST-008 |
+### 6.1 Standar teknis database
 
-### Catatan rancangan
+1. **Primary Key (`PK`):** Seluruh 42 tabel menggunakan **`UUID`** (`@id @default(uuid())`) yang bersifat *immutable*.
+2. **Foreign Key (`FK`) & Indeks:** Menggunakan konvensi penamaan `<entitas>_id` (misalnya `variant_id`, `sale_id`, `batch_id`, `allocation_id`, `package_size_id`). Setiap kolom FK wajib memiliki indeks (`@@index`), serta indeks komposit `@@index([variant_id, received_at, id])` pada `StockBatches` untuk optimasi pencarian dan penguncian batch FIFO.
+3. **Aturan `ON UPDATE`:** Menggunakan **`ON UPDATE RESTRICT`** karena PK UUID tidak boleh diubah.
+4. **Aturan `ON DELETE`:**
+   - **`ON DELETE RESTRICT`:** Wajib diterapkan pada seluruh relasi master ke transaksi (`Users`, `Products`, `ProductVariants`, `Suppliers`, `SalesChannels`, `Units`, `PackagingMaterials`, `PackageSizes`) serta relasi header transaksi ke detail, alokasi stok, dan jejak audit.
+   - **`ON DELETE CASCADE`:** Hanya diperbolehkan pada data turunan sementara atau konfigurasi paket sebelum transaksi yang aman dihapus bersama induknya, khususnya `Sessions` terhadap `Users` serta `PackageSizeItems` terhadap `PackageSizes`.
+5. **Tipe Data:** Nominal uang final menggunakan bilangan bulat (`Int`/`BigInt`); kuantitas dan biaya modal per satuan pakai kemasan menggunakan `Decimal(12, 4)`; tanggal dan waktu menggunakan `DateTime` (`timestamptz`).
+6. **Pembangkitan Nomor Dokumen:** Menggunakan *PostgreSQL Sequence* atomik di dalam transaksi database untuk menjamin keunikan tanpa tabrakan pada skenario akses bersamaan oleh dua pengelola.
 
-1. `VariantSuppliers` berada di tingkat varian karena harga beli melekat pada varian (TBD-25).
-2. `StockMovements` dan `PackagingMovements` adalah sumber saldo stok; saldo di tabel utama harus selalu cocok dengan jumlah catatannya.
-3. `SaleItems` dan `SalePackagingUsages` menyimpan snapshot harga, HPP, dan biaya.
-4. `MarketplaceClaims` dipisah dari `MarketplaceSettlements` karena status klaim tidak selalu sama dengan status dana.
-5. Pembayaran, pengeluaran, dan transaksi memakai penanda void dan pembuat void, bukan penghapusan baris.
-6. Entitas dapat digabung atau disederhanakan pada tahap ERD selama kebutuhan pencatatan tetap terpenuhi.
+### 6.2 Daftar entitas inti (34 Entitas Final + 1 Entitas Sementara Supplier-Varian)
 
-## 7. TBD dan Dampaknya pada Requirement
+#### A. Auth dan Sistem
+| No. | Entitas | Atribut Penting & Aturan Data | Relasi Utama & Kardinalitas | FR terkait |
+| --- | --- | --- | --- | --- |
+| 1 | `Users` | `id` (UUID PK), `username` (UNIQUE), `password_hash`, `role` (`PENGELOLA`), `is_active`, `created_at`. | Induk `1:N` bagi `Sessions` (`ON DELETE CASCADE`) dan `1:N` bagi seluruh kolom audit `created_by_id` (`ON DELETE RESTRICT`). | FR-AUTH-001 s.d. 007 |
+| 2 | `Sessions` | `id` (UUID PK), `user_id` (FK), `token_hash`, `expires_at`, `created_at`. | Anak `N:1` milik `Users` (`ON DELETE CASCADE`). | FR-AUTH-003, 005, 007 |
+| 3 | `BusinessSettings` | `id` (UUID PK), `business_name`, `address` (nullable), `phone` (nullable), `default_admin_fee_rate` (`Decimal`, default `22.00`, `CHECK 0..100`), `session_timeout_minutes`. | Entitas konfigurasi tunggal sistem (singleton). | FR-SET-001, 006 |
+| 4 | `ActivityLogs` | `id` (UUID PK), `entity_type`, `entity_id`, `action`, `details`, `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Users` (`ON DELETE RESTRICT`). | FR-AUTH-006, FR-HIST-008 |
 
-ID dan isi TBD sama dengan BRD v0.5 bagian 8 (pertanyaan dan asumsi lengkap ada di sana). Tabel ini menunjukkan requirement yang harus ditinjau ulang jika jawaban klien berbeda dari asumsi. Prioritas menunjukkan pengaruhnya pada struktur database.
+#### B. Produk dan Supplier
+| No. | Entitas | Atribut Penting & Aturan Data | Relasi Utama & Kardinalitas | FR terkait |
+| --- | --- | --- | --- | --- |
+| 5 | `ProductCategories` | `id` (UUID PK), `name`, `is_active`. | Induk `1:N` bagi `Products` (`ON DELETE RESTRICT`). | FR-PROD-002, FR-SET-004 |
+| 6 | `Products` | `id` (UUID PK), `category_id` (FK), `name`, `description` (nullable), `is_active`. | Anak `N:1` milik `ProductCategories`; induk `1:N` bagi `ProductVariants`. | FR-PROD-001, 011 |
+| 7 | `Units` | `id` (UUID PK), `name`, `allow_decimal` (Boolean), `decimal_places` (Int), `is_active`. | Induk `1:N` bagi `ProductVariants` dan `PackagingMaterials` (mendukung satuan bulat seperti `pcs`/`roll`/`pak` maupun desimal seperti `cm`/`meter`/`liter`/`kg`; struktur satuan produk menunggu `TBD-02`). | FR-SET-002 |
+| 8 | `ProductVariants` | `id` (UUID PK), `product_id` (FK), `unit_id` (FK), `name`, `barcode` (UNIQUE, nullable), `default_selling_price`, `stock_qty` (`Decimal(12,4)` — constraint `>= 0` menunggu `TBD-09`), `damaged_stock_qty` (`Decimal(12,4)`, `CHECK >= 0`), `min_stock` (`Decimal(12,4)`, nullable), `is_active`. | Anak `N:1` milik `Products` dan `Units`; dikunci dengan `FOR UPDATE` saat mutasi stok; memiliki stok independen tanpa konversi antarvarian. | FR-PROD-003, 004, 010 |
+| 9 | `VariantChannelPrices` | `id` (UUID PK), `variant_id` (FK), `sales_channel_id` (FK), `selling_price`. `UNIQUE(variant_id, sales_channel_id)`. | Tabel asosiasi `N:M` antara `ProductVariants` dan `SalesChannels` (`TBD-05`). | FR-SALE-013 |
+| 10 | `SalesChannels` | `id` (UUID PK), `name`, `is_marketplace` (Boolean — menentukan keberlakuan estimasi biaya admin 22%), `is_active`. | Induk `1:N` bagi `Sales` dan `VariantChannelPrices`. | FR-SALE-003, 007, FR-SET-003 |
+| 11 | `Suppliers` | `id` (UUID PK), `name`, `phone`, `address` (nullable), `notes` (nullable), `is_active`. | Induk `1:N` bagi `Purchases` (dan `VariantSuppliers` sementara). | FR-SUP-001 |
+| 12 | `VariantSuppliers` *(Sementara — TBD-25)* | `id` (UUID PK), `variant_id` (FK), `supplier_id` (FK), `purchase_price` (harga beli acuan terbaru). `UNIQUE(variant_id, supplier_id)`. | **Rancangan teknis sementara (`N:M`)** sambil menunggu konfirmasi `TBD-25` apakah relasi multi-supplier melekat pada varian (`VariantSuppliers`) atau produk (`ProductSuppliers`). Riwayat harga beli aktual tetap bersumber tunggal dari `PurchaseItems` & `StockBatches`. | FR-PROD-007 |
 
-| TBD | Topik | Prioritas | Requirement terdampak |
-| --- | --- | --- | --- |
-| TBD-01 | Stok varian | Tinggi | FR-PROD-003 |
-| TBD-02 | Satuan produk | Sedang | FR-PROD-003, FR-SET-002 |
-| TBD-03 | Metode HPP | Tinggi | FR-SALE-012, FR-PROD-006, FR-PACK-004, FR-DASH-003, FR-REPORT-004 sampai 007 |
-| TBD-04 | Biaya marketplace | Tinggi | FR-SALE-007, FR-DASH-003, FR-REPORT-007 |
-| TBD-05 | Harga per kanal | Sedang | FR-SALE-013 |
-| TBD-06 | Retur marketplace dan dana | Tinggi | FR-RET-005 sampai 007, FR-DASH-003, FR-REPORT-007, 009 |
-| TBD-07 | Barang rusak | Sedang | FR-RET-004, FR-RET-008 |
-| TBD-08 | Penerimaan sebagian | Sedang | FR-PUR-002, FR-PUR-003 |
-| TBD-09 | Stok negatif | Sedang | FR-SALE-011, FR-PROD-009, FR-PACK-003, FR-PACK-006 |
-| TBD-10 | Waktu pengurangan stok | Tinggi | FR-SALE-011 |
-| TBD-11 | Pembatalan penjualan | Sedang | FR-SALE-010 |
-| TBD-12 | Koreksi data | Sedang | FR-PUR-007, FR-PUR-008, FR-EXP-003 |
-| TBD-13 | Diskon dan biaya tambahan | Rendah | FR-SALE-005, FR-SALE-006 |
-| TBD-14 | Status dan metode pembayaran | Sedang | FR-SALE-001, 008, 009, FR-DASH-006, FR-REPORT-010 |
-| TBD-15 | Pembelian kemasan tunai atau tempo | Sedang | FR-PACK-002, FR-REPORT-010 |
-| TBD-16 | Pembulatan dan konversi satuan | Sedang | FR-SALE-014, FR-PACK-001, FR-PACK-004 |
-| TBD-17 | Jatuh tempo | Sedang | FR-PUR-005, FR-DASH-005, FR-REPORT-008 |
-| TBD-18 | Retur supplier | Sedang | FR-PUR-009 |
-| TBD-19 | Pengelolaan akun | Rendah | FR-AUTH-003, FR-AUTH-004 |
-| TBD-20 | Kanal penjualan | Rendah | FR-SALE-003, FR-SET-003 |
-| TBD-21 | Kategori | Rendah | FR-PROD-002, FR-EXP-002, FR-SET-004 |
-| TBD-22 | Batas stok minimum | Rendah | FR-PROD-010, FR-PACK-001, 007, FR-DASH-004, FR-SET-005 |
-| TBD-23 | Laporan | Rendah | FR-REPORT-001 sampai 003, FR-REPORT-011 |
-| TBD-24 | Perangkat, nota, offline | Rendah | FR-SALE-002, FR-SALE-015, FR-PROD-004, FR-SET-006, NFR-007 |
-| TBD-25 | Supplier dan varian | Sedang | FR-PROD-007 |
+#### C. Pembelian
+| No. | Entitas | Atribut Penting & Aturan Data | Relasi Utama & Kardinalitas | FR terkait |
+| --- | --- | --- | --- | --- |
+| 13 | `Purchases` | `id` (UUID PK), `purchase_number` (UNIQUE), `supplier_id` (FK), `purchase_date`, `payment_type` (`TUNAI`/`TEMPO`), `due_date` (nullable), `total_amount`, `paid_amount`, `remaining_amount`, `status` (`Draf`/`Dikonfirmasi`/`Diterima sebagian`/`Diterima seluruhnya`/`Dibatalkan`), `payment_status` (`Belum dibayar`/`Sebagian`/`Lunas`), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Suppliers` dan `Users`; induk `1:N` bagi `PurchaseItems`, `GoodsReceipts`, `SupplierPayments`, `SupplierReturns`. | FR-PUR-001, 002, 004, 005 |
+| 14 | `PurchaseItems` | `id` (UUID PK), `purchase_id` (FK), `variant_id` (FK), `ordered_qty` (`Decimal(12,4)`, `> 0`), `received_qty` (`Decimal(12,4)`), `unit_price` (sumber riwayat harga beli aktual). | Anak `N:1` milik `Purchases` dan `ProductVariants`; induk `1:N` bagi `GoodsReceiptItems`. | FR-PUR-001, 003, FR-PROD-005 |
+| 15 | `GoodsReceipts` | `id` (UUID PK), `receipt_number` (UNIQUE), `purchase_id` (FK), `received_at`, `notes` (nullable), `created_by_id` (FK). | Anak `N:1` milik `Purchases` dan `Users`; induk `1:N` bagi `GoodsReceiptItems`. | FR-PUR-003 |
+| 16 | `GoodsReceiptItems` | `id` (UUID PK), `goods_receipt_id` (FK), `purchase_item_id` (FK), `variant_id` (FK), `received_qty` (`Decimal(12,4)`, `> 0`). | Anak `N:1` milik `GoodsReceipts` dan `PurchaseItems`; relasi `1:1` memicu pembentukan 1 baris `StockBatches`. | FR-PUR-003 |
+| 17 | `SupplierPayments` | `id` (UUID PK), `purchase_id` (FK), `payment_date`, `amount`, `payment_method`, `is_void` (Boolean, default `false`), `void_reason` (nullable), `voided_by_id` (FK, nullable), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Purchases` dan `Users`. | FR-PUR-006, 007 |
+| 18 | `SupplierReturns` | `id` (UUID PK), `return_number` (UNIQUE), `purchase_id` (FK), `return_date`, `resolution_type` (`PENGEMBALIAN_UANG` / `BARANG_PENGGANTI` / `POTONGAN_TAGIHAN`), `calculated_return_amount` (otomatis `SUM(SupplierReturnItems.subtotal)`), `return_amount` (nominal final retur setelah penyesuaian opsional sebelum simpan), `settlement_date` (nullable — tanggal realisasi kas masuk / potong tagihan / terima barang pengganti), `reason`, `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Purchases` dan `Users`; induk `1:N` bagi `SupplierReturnItems` dan `1:0..N` bagi `StockBatches` (`SUPPLIER_REPLACEMENT`). | FR-PUR-009 |
+| 19 | `SupplierReturnItems` | `id` (UUID PK), `supplier_return_id` (FK), `goods_receipt_item_id` (FK), `batch_id` (FK), `variant_id` (FK), `qty` (`Decimal(12,4)`, `> 0`), `unit_price`, `subtotal` (`ROUND(qty × unit_price)`). | Anak `N:1` milik `SupplierReturns`, `GoodsReceiptItems`, dan `StockBatches` asal. | FR-PUR-009 |
+
+#### D. Stok FIFO dan Penjualan
+| No. | Entitas | Atribut Penting & Aturan Data | Relasi Utama & Kardinalitas | FR terkait |
+| --- | --- | --- | --- | --- |
+| 20 | `StockBatches` | `id` (UUID PK), `variant_id` (FK), `source_type` (`PURCHASE_RECEIPT` / `ADJUSTMENT` / `RETUR_TANPA_REFERENSI` / `SUPPLIER_REPLACEMENT`), `goods_receipt_item_id` (FK, nullable), `supplier_return_id` (FK, nullable), `received_at` (penentu urutan FIFO), `initial_qty` (`Decimal(12,4)`), `remaining_qty` (`Decimal(12,4)`, `CHECK >= 0 AND <= initial_qty`), `unit_cost` (`CHECK >= 0`). `@@index([variant_id, received_at, id])`. | Anak `N:1` milik `ProductVariants` (dan `0..1` `GoodsReceiptItems` / `SupplierReturns`); induk `1:N` bagi `SaleItemBatchAllocations`, `SupplierReturnItems`, dan `StockWriteOffBatchAllocations`. | FR-PROD-006, 009, FR-PUR-003, 009, FR-RET-004 |
+| 21 | `StockMovements` | `id` (UUID PK), `variant_id` (FK), `batch_id` (FK, nullable — wajib terisi untuk `stock_pool = SELLABLE`, 1 baris per batch terdampak), `stock_pool` (`SELLABLE` / `DAMAGED`), `movement_type` (`PENERIMAAN_PEMBELIAN` / `PENJUALAN` / `PEMBATALAN_PENJUALAN` / `RETUR_LAYAK_JUAL` / `RETUR_RUSAK` / `RETUR_SUPPLIER` / `PENGGANTI_RETUR_SUPPLIER` / `PENYESUAIAN_STOK` / `PENGHAPUSAN_STOK`), `qty_change` (`Decimal(12,4)`), `reference_type`, `reference_id`, `reference_number`, `notes` (nullable), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `ProductVariants`, `StockBatches` (`0..1`), dan `Users`; wajib disisipkan secara atomik dengan perubahan saldo varian. | FR-PROD-008, FR-RET-004 |
+| 22 | `Sales` | `id` (UUID PK), `transaction_number` (UNIQUE), `sales_channel_id` (FK), `package_size_id` (FK, nullable — standar ukuran paket awal yang dipilih di kasir), `external_order_number` (nullable), `transaction_date`, `subtotal_amount` (`SUM(SaleItems.subtotal_amount)`), `discount_amount` (diskon tingkat transaksi), `additional_fee_amount`, `total_amount` (`subtotal_amount − discount_amount + additional_fee_amount`), `admin_fee_estimate_rate` (`Decimal`, default `22.00` jika marketplace, `0` jika non-marketplace), `admin_fee_estimate_amount`, `admin_fee_actual_amount` (nullable — terpisah dari estimasi, evaluasi via `IS NOT NULL` sehingga `0` valid sebagai aktual), `order_status` (`Baru`/`Diproses`/`Selesai`/`Dibatalkan`), `payment_status` (`Belum dibayar`/`Dibayar`/`Dikembalikan`), `settlement_status` (`Belum cair`/`Sebagian cair`/`Sudah cair`/`Tidak dicairkan`), `is_stock_deducted` (Boolean), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `SalesChannels`, `PackageSizes` (`0..1`), dan `Users`; induk `1:N` bagi `SaleItems`, `SalePackagingUsages` (`1:0..N`), `SaleStatusHistories`, `SalePayments`, `MarketplaceSettlements`. | FR-SALE-001 s.d. 011, 014 |
+| 23 | `SaleItems` | `id` (UUID PK), `sale_id` (FK), `variant_id` (FK), `qty` (`Decimal(12,4)`, `> 0`), `unit_selling_price` (snapshot), `discount_amount` (diskon per item), `subtotal_amount` (`ROUND(qty × unit_selling_price) − discount_amount`), `total_hpp_fifo` (snapshot). | Anak `N:1` milik `Sales` dan `ProductVariants`; induk `1:N` bagi `SaleItemBatchAllocations`. | FR-SALE-005, 006, 012 |
+| 24 | `SaleItemBatchAllocations` | `id` (UUID PK), `sale_item_id` (FK), `batch_id` (FK), `allocated_qty` (`Decimal(12,4)`, `> 0`), `reversed_qty` (`Decimal(12,4)`, default `0`, `CHECK >= 0 AND <= allocated_qty`), `batch_unit_cost` (snapshot). | Tabel asosiasi `N:M` antara `SaleItems` dan `StockBatches`; induk `1:N` bagi `SaleItemBatchAllocationReversals`. | FR-PROD-006, FR-SALE-010, 012 |
+| 25 | `SaleItemBatchAllocationReversals` | `id` (UUID PK), `allocation_id` (FK), `reversal_type` (`CANCELLATION` / `CUSTOMER_RETURN`), `sale_status_history_id` (FK ke `SaleStatusHistories`, nullable), `customer_return_item_id` (FK ke `CustomerReturnItems`, nullable), `reversed_qty` (`Decimal(12,4)`, `> 0`), `created_by_id` (FK), `created_at`. *(Constraint `CHECK`: salah satu FK sumber wajib terisi sesuai `reversal_type`)*. | Anak `N:1` milik `SaleItemBatchAllocations`, `SaleStatusHistories` (`0..1`) / `CustomerReturnItems` (`0..1`), dan `Users`. | FR-SALE-010, FR-RET-004 |
+| 26 | `SaleStatusHistories` | `id` (UUID PK), `sale_id` (FK), `status_group` (`ORDER` / `PAYMENT` / `SETTLEMENT`), `old_status`, `new_status`, `reason` (nullable, wajib jika batal), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Sales` dan `Users`. | FR-SALE-008, 010, FR-HIST-007 |
+| 27 | `SalePayments` | `id` (UUID PK), `sale_id` (FK), `payment_date`, `amount`, `payment_method`, `is_void` (Boolean, default `false`), `void_reason` (nullable), `voided_by_id` (FK, nullable), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Sales` dan `Users`. | FR-SALE-001, 009 |
+| 28 | `MarketplaceSettlements` | `id` (UUID PK), `sale_id` (FK), `settlement_date`, `amount`, `notes` (nullable), `is_void` (Boolean, default `false`), `void_reason` (nullable), `voided_by_id` (FK, nullable), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Sales` dan `Users`. | FR-SALE-009 |
+
+#### E. Retur dan Pengeluaran
+| No. | Entitas | Atribut Penting & Aturan Data | Relasi Utama & Kardinalitas | FR terkait |
+| --- | --- | --- | --- | --- |
+| 29 | `CustomerReturns` | `id` (UUID PK), `return_number` (UNIQUE), `original_sale_id` (FK, nullable), `return_date`, `reason`, `claim_status` (`Belum diajukan`/`Dalam proses`/`Disetujui`/`Ditolak`), `fund_status` (`Belum diproses`/`Menunggu pengembalian dana`/`Dana dikembalikan`/`Dana tetap hak penjual`/`Belum dapat dipastikan`), `refund_amount`, `refund_paid_date` (nullable — wajib terisi jika `fund_status = Dana dikembalikan` & `refund_amount > 0`), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `Sales` (`0..1`) dan `Users`; induk `1:N` bagi `CustomerReturnItems` dan `CustomerReturnStatusHistories`. | FR-RET-001, 005, 006, 007 |
+| 30 | `CustomerReturnItems` | `id` (UUID PK), `customer_return_id` (FK), `sale_item_id` (FK, nullable), `variant_id` (FK), `qty` (`Decimal(12,4)`, `> 0`), `condition` (`Layak jual` / `Rusak`), `restored_hpp_amount` (default `0` — snapshot HPP yang dipulihkan). | Anak `N:1` milik `CustomerReturns`, `SaleItems` (`0..1`), dan `ProductVariants`. | FR-RET-002, 003, 004 |
+| 31 | `CustomerReturnStatusHistories` | `id` (UUID PK), `customer_return_id` (FK), `status_group` (`CLAIM` / `FUND`), `old_status`, `new_status`, `notes` (nullable), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `CustomerReturns` dan `Users`. | FR-RET-005, 006, FR-HIST-007 |
+| 32 | `StockWriteOffs` | `id` (UUID PK), `writeoff_number` (UNIQUE), `variant_id` (FK), `source_type` (`FROM_RETURN_DAMAGED` / `FROM_ACTIVE_STOCK`), `qty` (`Decimal(12,4)`, `> 0`), `loss_value` (`0` jika dari retur; total nilai batch FIFO terpotong jika dari stok aktif), `reason`, `created_by_id` (FK), `created_at`. | Anak `N:1` milik `ProductVariants` dan `Users`; induk `1:0..N` bagi `StockWriteOffBatchAllocations`. | FR-RET-008 |
+| 33 | `StockWriteOffBatchAllocations` | `id` (UUID PK), `stock_writeoff_id` (FK), `batch_id` (FK), `deducted_qty` (`Decimal(12,4)`, `> 0`), `batch_unit_cost` (snapshot). | Tabel asosiasi `N:M` antara `StockWriteOffs` (`FROM_ACTIVE_STOCK`) dan `StockBatches`. | FR-RET-008 |
+| 34 | `ExpenseCategories` | `id` (UUID PK), `name`, `is_active`. | Induk `1:N` bagi `Expenses`. | FR-EXP-002, FR-SET-004 |
+| 35 | `Expenses` | `id` (UUID PK), `expense_category_id` (FK), `expense_date`, `amount` (`> 0`), `description`, `is_void`, `void_reason` (nullable), `voided_by_id` (FK, nullable), `created_by_id` (FK), `created_at`. | Anak `N:1` milik `ExpenseCategories` dan `Users`. | FR-EXP-001, 003 |
+
+### 6.3 Sub-Skema Perlengkapan Kemasan & Standar Ukuran Paket (7 Entitas)
+
+Sub-skema berikut telah diperbarui dengan entitas **`PackageSizes`** dan **`PackageSizeItems`** sesuai keputusan klien tanggal 20 November 2026 (`TBD-16` tertutup). Atribut terkait biaya modal rata-rata (`average_unit_cost`), batas stok negatif (`TBD-09`), dan metode pembayaran pembelian kemasan (`TBD-15`) menggunakan rancangan default siap pakai sambil menunggu konfirmasi akhir.
+
+| No. | Entitas | Atribut Penting & Aturan Data | Relasi Utama & Kardinalitas | FR terkait |
+| --- | --- | --- | --- | --- |
+| 36 | `PackagingMaterials` | `id` (UUID PK), `name` (dinamis: kardus, plastik, bubble wrap, lakban, stiker fragile, dll.), `purchase_unit_id` (FK ke `Units` — mis. roll, pak, pcs), `usage_unit_id` (FK ke `Units` — mis. `cm`, `pcs`, `lembar`), `conversion_factor` (`Decimal(12,4)`, `> 0` — konversi satuan beli ke satuan pakai), `stock_qty` (`Decimal(12,4)` dalam satuan pakai — constraint `>= 0` menunggu **`TBD-09`**), `min_stock` (`Decimal(12,4)`, nullable), `average_unit_cost` (`Decimal(12,4)`, default `0` — biaya modal per satuan pakai, rancangan default menunggu konfirmasi akhir **`TBD-03B`**), `is_active`. | Anak `N:1` milik `Units`; induk `1:N` bagi `PackageSizeItems`, `PackagingPurchaseItems`, `PackagingMovements`, dan `SalePackagingUsages`. | FR-PACK-001, 008 |
+| 37 | `PackageSizes` *(Baru)* | `id` (UUID PK), `name` (UNIQUE — dinamis, contoh awal: `XS`, `S`, `M`, `L`, `XL`, `XXL`), `dimension_label` (nullable — contoh: `15 × 10 × 8 cm`), `sort_order` (Int, default `0`), `is_active` (Boolean, default `true`). | Induk `1:N` bagi `PackageSizeItems` (`ON DELETE CASCADE`) dan `1:0..N` bagi `Sales` (`ON DELETE RESTRICT`). | FR-PACK-002, FR-SET-006 |
+| 38 | `PackageSizeItems` *(Baru)* | `id` (UUID PK), `package_size_id` (FK), `packaging_material_id` (FK), `default_usage_qty` (`Decimal(12,4)`, `> 0` — takaran pemakaian standar dalam satuan pakai material). `UNIQUE(package_size_id, packaging_material_id)`. | Tabel asosiasi `N:M` antara `PackageSizes` dan `PackagingMaterials` (menyimpan resep standar tiap ukuran paket yang dapat ditambah/dikurangi/disesuaikan). | FR-PACK-002, FR-SALE-014 |
+| 39 | `PackagingPurchases` | `id` (UUID PK), `purchase_number` (UNIQUE), `purchase_date`, `total_amount`, `notes` (nullable), `created_by_id` (FK), `created_at`. *(Relasi `supplier_id`, jatuh tempo, status pembayaran, dan tabel `PackagingPayments` menunggu **`TBD-15`**)*. | Anak `N:1` milik `Users`; induk `1:N` bagi `PackagingPurchaseItems`. | FR-PACK-003 |
+| 40 | `PackagingPurchaseItems` | `id` (UUID PK), `packaging_purchase_id` (FK), `packaging_material_id` (FK), `purchase_qty` (`Decimal(12,4)`, `> 0`), `converted_usage_qty` (`Decimal(12,4)`, `> 0` — hasil `purchase_qty × conversion_factor`), `unit_price`, `subtotal`. | Anak `N:1` milik `PackagingPurchases` dan `PackagingMaterials`. | FR-PACK-003 |
+| 41 | `PackagingMovements` | `id` (UUID PK), `packaging_material_id` (FK), `movement_type` (`PEMBELIAN` / `PEMAKAIAN_PENJUALAN` / `PEMBATALAN_PENJUALAN` / `PENYESUAIAN_STOK`), `qty_change` (`Decimal(12,4)` dalam satuan pakai), `reference_type`, `reference_id`, `reference_number`, `created_by_id` (FK), `created_at`. | Anak `N:1` milik `PackagingMaterials` dan `Users`. | FR-PACK-006, 007 |
+| 42 | `SalePackagingUsages` | `id` (UUID PK), `sale_id` (FK), `packaging_material_id` (FK), `standard_usage_qty` (`Decimal(12,4)`, `>= 0` — snapshot takaran standar dari `PackageSizeItems`, `0` jika material tambahan di kasir), `actual_usage_qty` (`Decimal(12,4)`, `>= 0` — takaran aktual terpakai yang dapat disesuaikan di kasir), `unit_cost_snapshot` (`Decimal(12,4)` — snapshot biaya modal per satuan pakai saat diproses), **`calculated_hpp`** (bilangan bulat Rupiah hasil pembulatan `ROUND(actual_usage_qty × unit_cost_snapshot)`), **`adjusted_hpp`** (nullable — bilangan bulat Rupiah hasil penyesuaian manual terpisah pada paket transaksi), `is_stock_deducted` (Boolean, default `false`), `is_stock_restored` (Boolean, default `false`). | Anak `N:1` milik `Sales` (relasi opsional `1:0..N`) dan `PackagingMaterials`. | FR-SALE-014, FR-PACK-004, 005 |
+
+## 7. Daftar TBD Terbuka, Asumsi Sementara, dan Evaluasi Pemblokir ERD Final
+
+Setelah klien mengonfirmasi konsep **Standar Ukuran Paket Kemasan** dan penggunaan satuan pakai (`cm`/`pcs`) pada 20 November 2026, **`TBD-16` resmi ditutup**. Dari 16 butir TBD yang tersisa di BRD v0.8 Bagian 8.2, seluruh **5 butir yang berpotensi memengaruhi constraint/kolom final** telah memiliki rancangan default siap pakai pada skema 42 entitas di atas:
+
+| ID TBD | Pertanyaan / Konfirmasi untuk Klien | Asumsi Sementara & Rancangan Teknis Default | Berpotensi Ubah Struktur Final? | Alasan Dampak pada Struktur Database |
+| --- | --- | --- | --- | --- |
+| **TBD-02** | Apakah satuan produk (misal pcs, botol, pak) selalu berdiri sebagai varian terpisah tanpa konversi otomatis, atau ada produk yang memerlukan konversi multi-satuan (misal 1 pak = 12 pcs)? | Satuan melekat pada varian (`Units`); perbedaan kemasan jual dicatat sebagai varian terpisah. | **Ya (Kondisional)** | Jika tanpa konversi, struktur `Units` + `ProductVariants` saat ini final. Jika butuh konversi multi-satuan per produk, perlu tabel baru `ProductUnitConversions`. |
+| **TBD-03B** | *(Menunggu konfirmasi akhir atas chat 20 Nov 2026)* Apakah harga modal per satuan pakai kemasan (`cm`/`pcs`) otomatis dihitung rata-rata tertimbang dari riwayat belanja kemasan (dengan opsi ubah manual), atau diisi manual seluruhnya di master kemasan? | Otomatis dihitung rata-rata per satuan pakai (`average_unit_cost` `Decimal(12,4)`) saat pembelian kemasan masuk (dengan opsi ubah manual), serta `calculated_hpp` dan `adjusted_hpp` terpisah pada `SalePackagingUsages`. | **Ya (Minor)** | Kolom `average_unit_cost` pada `PackagingMaterials` sudah menampung baik mode otomatis rata-rata maupun mode isi manual tanpa perlu menambah tabel baru. |
+| **TBD-09** | Jika stok produk atau kemasan di sistem tercatat 0/kurang, apakah pemrosesan pesanan wajib diblokir atau diizinkan menjadi negatif? | Sementara pemrosesan ditolak jika stok kurang; belum memasang *hard constraint* `CHECK (stock_qty >= 0)` sebelum dikonfirmasi. | **Ya (Constraint)** | Menentukan pemasangan `CHECK (stock_qty >= 0)` pada migrasi database final untuk `ProductVariants` dan `PackagingMaterials`. |
+| **TBD-15** | Apakah pembelian perlengkapan kemasan selalu dibayar tunai/lunas saat beli, atau bisa dibeli secara tempo (utang) ke supplier? | Sementara pembelian perlengkapan kemasan dianggap tunai/langsung lunas pada `PackagingPurchases` tanpa tabel utang kemasan. | **Ya** | Jika bisa tempo, `PackagingPurchases` memerlukan `supplier_id`, `due_date`, `paid_amount`, `remaining_amount`, serta tabel baru `PackagingPayments`. |
+| **TBD-25** | Apakah hubungan banyak supplier melekat pada tiap **varian produk** atau pada **produk induk**, dan apakah perubahan harga acuan di luar pembelian perlu dicatat riwayatnya? | Sementara diasumsikan relasi multi-supplier berada pada tingkat varian (`VariantSuppliers`), sedangkan riwayat harga beli aktual bersumber tunggal dari `PurchaseItems` & `StockBatches`. | **Ya** | Menentukan apakah entitas relasi multi-supplier memakai FK `variant_id` (`VariantSuppliers`) atau `product_id` (`ProductSuppliers`). |
+| **TBD-05** | Apakah satu varian produk dapat memiliki harga jual berbeda antar-marketplace/kanal penjualan? | Harga default varian dapat memiliki override per kanal pada `VariantChannelPrices` dan diubah saat transaksi. | Tidak | Struktur tabel `VariantChannelPrices` sudah siap menampung baik kondisi digunakan maupun tidak digunakan. |
+| **TBD-11** | Jika pesanan berstatus `Diproses` dibatalkan, apakah stok perlengkapan kemasan otomatis kembali ke stok atau dikonfirmasi manual oleh pengelola? | Stok produk otomatis kembali ke batch asal; stok kemasan tidak otomatis kembali kecuali dipilih pengelola. | Tidak | Hanya memengaruhi logika transaksi aplikasi dan flag `is_stock_restored` yang sudah tersedia. |
+| **TBD-12** | Apakah kedua pengelola bebas melakukan void/koreksi atas pembelian, pembayaran, pencairan dana, dan pengeluaran operasional? | Kedua pengelola diperbolehkan melakukan void/koreksi dengan alasan wajib dan jejak riwayat. | Tidak | Kolom audit void (`is_void`, `void_reason`, `voided_by_id`) tetap dibutuhkan terlepas dari aturan otorisasinya. |
+| **TBD-13** | Apakah diskon diberikan per item, per transaksi, atau keduanya, dan biaya tambahan apa saja yang dibebankan ke pelanggan? | Mendukung diskon nominal per item (`SaleItems.discount_amount`) maupun per transaksi (`Sales.discount_amount`) serta biaya tambahan (`Sales.additional_fee_amount`). | Tidak | Kolom diskon baris dan diskon header sudah tersedia tanpa risiko hitung ganda. |
+| **TBD-14** | Apa saja daftar lengkap metode pembayaran yang digunakan usaha (tunai, transfer, QRIS, dll.)? | Metode: tunai, transfer, QRIS, lainnya; tiga kelompok status terpisah pada `Sales`. | Tidak | Tiga kelompok status sudah terpisah pada `Sales` dan `SaleStatusHistories`. |
+| **TBD-17** | Apakah pengisian tanggal jatuh tempo wajib pada setiap pembelian tempo dari supplier? | `due_date` bersifat opsional; tagihan melewati jatuh tempo dengan sisa utang lebih dari 0 ditandai terlambat. | Tidak | Hanya memengaruhi validasi wajib/opsional di layer aplikasi (kolom `due_date` sudah tersedia). |
+| **TBD-19** | Bagaimana prosedur pemulihan akses jika salah satu pengelola lupa password akunnya? | Ganti password mandiri saat login; reset password akun rekan yang lupa dibantu pengelola lain. | Tidak | Tidak mengubah struktur tabel `Users` maupun `Sessions`. |
+| **TBD-20** | Apakah pengelola boleh menambah atau menonaktifkan kanal penjualan baru secara mandiri dari menu pengaturan? | Pengelola dapat mengelola kanal penjualan melalui menu pengaturan (`SalesChannels`). | Tidak | Tabel master `SalesChannels` sudah tersedia. |
+| **TBD-21** | Apakah pengelola boleh menambah atau mengubah kategori produk dan kategori pengeluaran sendiri? | Kedua jenis kategori dikelola mandiri melalui menu pengaturan. | Tidak | Tabel master kategori sudah tersedia. |
+| **TBD-22** | Bagaimana cara menentukan batas stok minimum untuk peringatan stok rendah pada produk dan kemasan? | Diisi manual per varian dan per perlengkapan kemasan; bila kosong peringatan tidak aktif. | Tidak | Kolom `min_stock` nullable sudah tersedia pada kedua tabel. |
+| **TBD-23** | Apa saja rentang periode laporan standar dan format ekspor laporan yang dibutuhkan? | Filter harian, bulanan, rentang tanggal bebas; ekspor CSV dan cetak browser. | Tidak | Hanya memengaruhi query laporan dan formatter ekspor di aplikasi. |
 
 ## 8. Kriteria Penerimaan Sistem
 
-Kriteria berstatus *Blocked* baru dapat dinyatakan lulus setelah TBD terkait dikonfirmasi atau asumsinya disetujui.
+Kriteria berstatus *Blocked* baru dapat dinyatakan lulus final setelah TBD terkait dikonfirmasi atau asumsinya disetujui klien.
 
-| No. | Kriteria | Status pengujian |
+| No. | Kriteria pengujian | Status pengujian |
 | --- | --- | --- |
-| 1 | Pengguna dapat login dan logout; halaman internal tertutup tanpa login. | Dapat diuji |
-| 2 | Kedua akun pengelola memakai semua fitur operasional dengan hak setara. | Dapat diuji |
-| 3 | Produk, varian, kategori, dan barcode dapat dikelola; scan barcode menemukan varian di kasir. | Blocked: TBD-01, TBD-02 |
-| 4 | Penjualan offline dan marketplace dapat dicatat dengan status, pembatalan, dan nota. | Blocked: TBD-10, TBD-11, TBD-13, TBD-14 |
-| 5 | Harga jual dan HPP historis tidak berubah ketika harga diperbarui. | Blocked: TBD-03 |
-| 6 | Pembelian multi-barang, penerimaan barang, dan pembayaran supplier bertahap dapat dicatat; stok hanya bertambah dari barang diterima. | Blocked: TBD-08 |
-| 7 | Tagihan supplier dengan jatuh tempo dan keterlambatan tampil di dashboard dan laporan. | Blocked: TBD-17 |
-| 8 | Retur pelanggan dan supplier dapat dicatat; status klaim terpisah dari status dana. | Blocked: TBD-06, TBD-07, TBD-18 |
-| 9 | Bahan kemasan dapat dibeli, dipakai, dan dipantau; biaya masuk HPP saat dipakai. | Blocked: TBD-03, TBD-15, TBD-16 |
-| 10 | Pengeluaran operasional tercatat terpisah dari HPP dan kemasan. | Dapat diuji |
-| 11 | Penjualan atau pemakaian melebihi stok ditolak. | Blocked: TBD-09 |
-| 12 | Laporan keuntungan dan arus kas menghasilkan angka yang sama dengan hitungan manual pada data uji. | Blocked: TBD-03, TBD-04, TBD-06 |
-| 13 | Dashboard dan laporan memakai angka yang sama untuk periode yang sama. | Dapat diuji |
-| 14 | Void pembelian, pembayaran, dan pengeluaran meninggalkan riwayat dan menghitung ulang total. | Blocked: TBD-12 |
-| 15 | Riwayat stok, status, dan aktivitas pengguna dapat ditelusuri. | Dapat diuji |
-| 16 | Pengaturan kanal, kategori, satuan, dan batas stok dapat diubah dan langsung berlaku. | Dapat diuji |
+| 1 | Kedua akun `PENGELOLA` dapat login, mengganti password (dengan pemutusan sesi aktif lain), dan logout; seluruh halaman internal tertutup tanpa sesi aktif. | Dapat diuji |
+| 2 | Kedua akun pengelola memakai seluruh fitur operasional dengan hak setara dari perangkat PC maupun HP melalui jaringan Wi-Fi lokal (LAN) tanpa ketergantungan koneksi internet. | Dapat diuji |
+| 3 | Pencadangan database PostgreSQL otomatis harian (`pg_dump`) berjalan terjadwal ke **perangkat penyimpanan fisik terpisah** dari media database utama, mencatat status `SUCCESS` atau `FAILED` saat server menyala, mendeteksi status `MISSED` / `OVERDUE` ketika server dinyalakan kembali setelah melewatkan jadwal harian, serta prosedur pemulihan database teruji minimal 1 kali sebulan. | Dapat diuji |
+| 4 | Produk, varian dengan stok independen (tanpa konversi otomatis), kategori, dan barcode dapat dikelola; scan barcode menemukan varian di kasir. | Blocked: TBD-02 |
+| 5 | Penjualan offline dan marketplace dapat dicatat lengkap dengan perhitungan diskon item dan diskon transaksi yang konsisten (tanpa hitung ganda), tiga kelompok status otomatis terbarui, pembayaran, pencairan dana, dan cetak nota via browser. | Blocked: TBD-13, TBD-14 |
+| 6 | Stok produk tidak berkurang saat pesanan berstatus `Baru`, berkurang satu kali saat status menjadi `Diproses` dengan penguncian konkuren (aman bila dua pengelola memproses bersamaan), dipulihkan ke batch asal jika `Diproses` dibatalkan, dan menolak pembatalan langsung untuk pesanan berstatus `Selesai`. | Blocked: TBD-11 |
+| 7 | Pembelian multi-barang, penerimaan barang bertahap, dan pembayaran supplier bertahap dapat dicatat; stok dan batch FIFO langsung bertambah sesuai kuantitas diterima tanpa menunggu seluruh pesanan selesai. | Dapat diuji |
+| 8 | HPP produk dihitung menggunakan metode FIFO dari batch penerimaan barang paling awal (serta batch penyesuaian/retur tanpa referensi/pengganti retur supplier yang memiliki `unit_cost` valid) dan disimpan sebagai snapshot historis pada transaksi. | Dapat diuji |
+| 9 | Estimasi biaya admin marketplace terhitung otomatis sebesar 22% dari `(Sales.subtotal_amount − Sales.discount_amount)` hanya pada kanal dengan `is_marketplace = true`, digantikan oleh biaya aktual (`admin_fee_actual_amount IS NOT NULL`, termasuk nilai `0`) setelah dana diterima tanpa dijumlahkan ganda, dan menjadi komponen pengurang **Pemasukan Bersih**. | Dapat diuji |
+| 10 | Tagihan supplier dengan jatuh tempo dan keterlambatan tampil di dashboard dan laporan. | Blocked: TBD-17 |
+| 11 | Retur pelanggan dan supplier dapat dicatat lengkap dengan nomor unik, konsistensi nilai header dan item retur supplier (termasuk barang pengganti), kondisi barang retur pelanggan (`Layak jual` dipulihkan ke batch asal dengan *Last-Allocated, First-Restored* dan mengunci `restored_hpp_amount`, `Rusak` masuk kolam stok `DAMAGED` bernilai nol), riwayat status klaim/dana terpisah, dan tanggal bayar refund (tidak melebihi nilai neto dibayar pembeli). | Dapat diuji |
+| 12 | Master material kemasan dan master **Standar Ukuran Paket (`XS`–`XXL`, dll.)** dapat ditambah, dikurangi, dan disesuaikan komposisi maupun takaran pakainya; perlengkapan kemasan dapat dibeli sebagai persediaan dengan konversi satuan beli ke satuan pakai (`cm`/`pcs`); pemilihan standar ukuran paket pada transaksi bersifat opsional dan mendukung penyesuaian pemakaian aktual (`actual_usage_qty`) maupun nominal HPP kemasan (`adjusted_hpp`) tanpa hitung ganda. | Blocked: TBD-03B, TBD-15 |
+| 13 | Pengeluaran operasional dan penghapusan stok aktif (memotong batch FIFO dan mencatat `loss_value`) tercatat akurat pada laporan laba rugi. | Dapat diuji |
+| 14 | Validasi stok produk dan perlengkapan kemasan berjalan sesuai aturan stok negatif, menjaga `StockBatches.remaining_qty >= 0`, serta lulus verifikasi prosedur rekonsiliasi buku besar stok (`SELLABLE` vs `DAMAGED`, 1 baris mutasi per batch terdampak). | Blocked: TBD-09 |
+| 15 | Laporan penjualan, keuntungan (`Pemasukan Bersih`, `Laba Kotor`, `Laba Bersih`), dan arus kas menghasilkan angka yang konsisten dengan hitungan manual. | Dapat diuji |
+| 16 | Void pembelian, pembayaran supplier, pembayaran penjualan, pencairan marketplace, dan pengeluaran meninggalkan riwayat dan menghitung ulang total serta status terkait. | Blocked: TBD-12 |
+| 17 | Persentase default estimasi biaya admin marketplace (nilai awal 22%) dapat diubah di pengaturan dan hanya berlaku untuk transaksi baru tanpa mengubah data historis. | Dapat diuji |
 
-## 9. Matriks Keterlacakan BRD ke SRS
+## 9. Matriks Keterlacakan BRD v0.8 ke SRS v1.2
 
-Setiap BR di BRD v0.5 punya minimal satu requirement di SRS.
+Seluruh 21 kebutuhan bisnis (`BR-001` sampai `BR-021`) pada BRD v0.8 memiliki keterlacakan penuh ke requirement pada SRS v1.2:
 
 | ID BRD | Kebutuhan bisnis | Requirement SRS |
 | --- | --- | --- |
-| BR-001 | Penjualan offline dan marketplace | FR-SALE-001, 003, 004, 013 |
-| BR-002 | Transaksi terstruktur, status, pembatalan, nota | FR-SALE-001, 005, 006, 008, 010, 015; FR-HIST-001, 007 |
-| BR-003 | Harga dan HPP historis | FR-SALE-012; FR-PROD-005 |
-| BR-004 | Varian produk | FR-PROD-001, 002, 003 |
-| BR-005 | Barcode | FR-PROD-004; FR-SALE-002 |
-| BR-006 | Varian dan banyak supplier | FR-PROD-007; FR-SUP-001 |
-| BR-007 | Pembelian dan penerimaan barang | FR-PUR-001, 002, 003, 010; FR-PROD-005; FR-HIST-002 |
-| BR-008 | Pembelian tempo dan bertahap | FR-PUR-004, 006, 010; FR-HIST-003 |
-| BR-009 | Retur pelanggan dan supplier | FR-PUR-009; FR-RET-001 sampai 009; FR-HIST-004 |
-| BR-010 | Persediaan kemasan terpisah | FR-PACK-001, 002, 005 sampai 008; FR-EXP-002 |
-| BR-011 | Perhitungan HPP | FR-SALE-014; FR-PROD-006; FR-PACK-003, 004; FR-REPORT-006 |
-| BR-012 | Dashboard dan laporan | FR-DASH-001 sampai 004, 006; FR-REPORT-001 sampai 007, 009, 011 |
-| BR-013 | Dua akun setara | FR-AUTH-001 sampai 005, 007 |
-| BR-014 | Riwayat aktivitas | FR-AUTH-006; FR-HIST-001, 003, 005 sampai 008 |
-| BR-015 | Perlindungan data historis | FR-PROD-011; FR-SUP-001; FR-SALE-010; FR-PUR-007, 008; FR-EXP-003; FR-AUTH-004 |
-| BR-016 | Pengelolaan stok | FR-PROD-008, 009, 010; FR-SALE-011; FR-SET-005 |
+| BR-001 | Penjualan multi-marketplace dan offline manual | FR-SALE-001, 003, 004, 013 |
+| BR-002 | Pencatatan transaksi terstruktur, status, pembatalan, nota | FR-SALE-001, 005, 006, 008, 010, 015; FR-HIST-001, 007 |
+| BR-003 | Harga jual dan HPP historis | FR-SALE-012; FR-PROD-005 |
+| BR-004 | Produk dengan varian stok independen | FR-PROD-001, 002, 003 |
+| BR-005 | Pengelolaan dan pemindaian barcode | FR-PROD-004; FR-SALE-002 |
+| BR-006 | *(Sementara, TBD-25)* Hubungan varian produk dengan banyak supplier | FR-PROD-007; FR-SUP-001 |
+| BR-007 | Pembelian dan penerimaan barang bertahap | FR-PUR-001, 002, 003, 010; FR-PROD-005; FR-HIST-002 |
+| BR-008 | Pembelian tempo dan pembayaran bertahap | FR-PUR-004, 006, 010; FR-HIST-003 |
+| BR-009 | Retur pelanggan dan supplier | FR-PUR-009; FR-RET-001 sampai 009; FR-HIST-004, 007 |
+| BR-010 | Pemisahan persediaan kemasan dari pengeluaran operasional & konversi satuan | FR-PACK-001, 003, 006 sampai 009; FR-EXP-002 |
+| BR-011 | Perhitungan HPP produk (FIFO) dan HPP kemasan berbasis standar ukuran paket | FR-SALE-012, 014; FR-PROD-006; FR-PACK-004, 005; FR-REPORT-006 |
+| BR-012 | Dashboard dan laporan usaha | FR-DASH-001 sampai 006; FR-REPORT-001 sampai 007, 009, 011; NFR-012 |
+| BR-013 | Dua akun `PENGELOLA` dengan hak akses setara | FR-AUTH-001 sampai 005, 007; NFR-007 |
+| BR-014 | Riwayat aktivitas pengguna | FR-AUTH-006; FR-HIST-001, 003, 005 sampai 008 |
+| BR-015 | Perlindungan data historis | FR-PROD-011; FR-SUP-001; FR-SALE-009, 010; FR-PUR-007, 008; FR-EXP-003; FR-AUTH-004 |
+| BR-016 | Pengelolaan stok dan pengurangan saat pesanan diproses | FR-PROD-008, 009, 010; FR-SALE-011; FR-SET-005 |
 | BR-017 | Pengeluaran operasional | FR-EXP-001 sampai 004; FR-REPORT-003 |
-| BR-018 | Pengaturan sistem | FR-SET-001 sampai 006 |
-| BR-019 | Biaya marketplace | FR-SALE-007, 009; FR-REPORT-007 |
-| BR-020 | Arus kas dan utang supplier | FR-PUR-005; FR-SALE-009; FR-DASH-005, 007; FR-REPORT-008, 010 |
+| BR-018 | Pengaturan sistem, master standar ukuran paket, dan default estimasi biaya admin | FR-SET-001 sampai 006 |
+| BR-019 | Estimasi biaya admin marketplace (default 22%) vs biaya aktual sebagai pengurang Pemasukan Bersih | FR-SALE-007, 009; FR-DASH-001; FR-REPORT-001, 007; FR-SET-003, 006 |
+| BR-020 | Informasi arus kas dan utang supplier | FR-PUR-005, 009; FR-SALE-009; FR-RET-007; FR-DASH-005, 007; FR-REPORT-008, 010 |
+| BR-021 | Standar ukuran paket dinamis (`XS`–`XXL`, dll.) dan penyesuaian aktual di kasir | FR-SALE-014; FR-PACK-002, 004, 005, 009; FR-REPORT-006; FR-SET-006 |
 
 ## 10. Riwayat Perubahan Dokumen
 
 | Versi | Tanggal | Perubahan |
 | --- | --- | --- |
-| 0.3 | 12 November 2026 | Revisi berdasarkan BRD v0.4. |
-| 0.4 | 13 November 2026 | Acuan BRD v0.5; ID aturan bisnis memakai BRULE (dirujuk dari BRD); kriteria penerimaan dikembalikan di setiap FR; TBD diselaraskan menjadi 25 butir; ditambah FR otorisasi server, diskon, biaya marketplace, pencairan dana, jatuh tempo, void, laporan arus kas, ekspor, kategori produk; NFR terukur dan anti transaksi ganda; matriks keterlacakan mencakup BR-001 sampai BR-020. |
-
-**Status: Draft Revision, menunggu review dan konfirmasi klien.**
+| 0.4 | 12 November 2026 | Acuan BRD v0.5; 25 TBD; 35 entitas awal; matriks keterlacakan BR-001 sampai BR-020. |
+| 0.5–0.7 | 18–19 November 2026 | Sinkronisasi BRD v0.6–v0.7 dan Analisis Teknis Database Terkoreksi. |
+| 0.8 | 19 November 2026 | Sinkronisasi dengan BRD v0.7.2: penyelarasan `FR-PROD-007` dan `VariantSuppliers` sebagai rancangan sementara (`TBD-25`), pemisahan status `TBD-15`, penguatan `NFR-012` backup ke media fisik terpisah dan uji recovery bulanan. |
+| 0.9 | 19 November 2026 | Penyelesaian temuan audit SRS v0.8 (`stock_pool` pada `StockMovements`, pemecahan FK eksplisit pada `SaleItemBatchAllocationReversals`, aturan `unit_cost` batch non-pembelian, penanda `is_marketplace`, `StockWriteOffBatchAllocations`, `refund_paid_date`, `CustomerReturnStatusHistories`, dan mekanisme void `SalePayments` & `MarketplaceSettlements`). |
+| 1.0 Draft | 19 November 2026 | Pemisahan status `FAILED` saat server menyala dan deteksi jadwal terlewat `MISSED`/`OVERDUE` (`NFR-012`, `FR-SET-006`); penegasan hierarki diskon item & transaksi tanpa hitung ganda; penguncian baris konkuren (`FOR UPDATE`) dan prosedur rekonsiliasi stok; konsistensi nominal retur supplier; evaluasi ulang `TBD-02` dan `TBD-16` sebagai pemblokir ERD final. |
+| 1.1 - ERD Ready Candidate | 19 November 2026 | Finalisasi audit menyeluruh sebelum ERD: (1) aturan eksplisit `admin_fee_actual_amount IS NOT NULL` agar nilai aktual `0` tidak dianggap kosong (`FR-SALE-007`); (2) siklus `SUPPLIER_REPLACEMENT` pada `StockBatches` & `FR-PUR-009` untuk retur supplier barang pengganti; (3) kewajiban 1 baris `StockMovements` per `StockBatch` terdampak pada `SELLABLE` (`FR-PROD-008`); (4) atribut idempoten `is_stock_deducted` & `is_stock_restored` pada `SalePackagingUsages`; (5) batas maksimal refund proporsional neto pada retur berdiskon (`FR-RET-007`, `VR-019`); (6) pembaruan otomatis `settlement_status` saat pencairan/void (`FR-SALE-009`); (7) *PostgreSQL Sequence* atomik untuk nomor dokumen (`VR-001`); (8) penamaan kolom sementara `average_unit_cost` pada `PackagingMaterials`, kardinalitas lengkap seluruh 40 entitas, serta pertanyaan klarifikasi klien untuk 17 TBD. |
+| 1.2 - ERD Ready Candidate | 20 November 2026 | Sinkronisasi dengan **BRD BizManage v0.8** berdasarkan keputusan klien mengenai pengemasan: (1) penambahan 2 entitas baru (`PackageSizes` dan `PackageSizeItems`) untuk mengelola master **Standar Ukuran Paket** dinamis (`XS`–`XXL`, dll.) dan resep material penyusunnya (`FR-PACK-002`, `FR-SET-006`), sehingga total entitas menjadi **42 entitas**; (2) penambahan FK opsional `package_size_id` pada `Sales` serta pemisahan `standard_usage_qty`, `actual_usage_qty`, dan `unit_cost_snapshot` pada `SalePackagingUsages` (`FR-SALE-014`, `FR-PACK-004`, `FR-PACK-005`); (3) penambahan kolom `converted_usage_qty` pada `PackagingPurchaseItems` (`FR-PACK-003`); (4) penutupan `TBD-16` dan sinkronisasi penuh seluruh bagian dokumen dengan BRD v0.8. |

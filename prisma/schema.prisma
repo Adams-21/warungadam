@@ -1,3 +1,9 @@
+// ============================================================================
+// BIZMANAGE - PRISMA SCHEMA (42 ENTITAS)
+// Acuan : SRS BizManage v1.2 & DBML v1.2
+// DBMS  : PostgreSQL
+// ============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,28 +13,926 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
   PENGELOLA
 }
 
-model User {
-  id           String    @id @default(cuid())
-  username     String    @unique
-  passwordHash String
-  role         Role      @default(PENGELOLA)
-  isActive     Boolean   @default(true)
-  sessions     Session[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+enum PaymentType {
+  TUNAI
+  TEMPO
 }
 
-model Session {
-  id        String   @id
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+enum PurchaseStatus {
+  Draf
+  Dikonfirmasi
+  Diterima_sebagian
+  Diterima_seluruhnya
+  Dibatalkan
+}
 
-  @@index([userId])
-  @@index([expiresAt])
+enum PaymentStatus {
+  Belum_dibayar
+  Sebagian
+  Lunas
+}
+
+enum SupplierReturnResolution {
+  PENGEMBALIAN_UANG
+  BARANG_PENGGANTI
+  POTONGAN_TAGIHAN
+}
+
+enum BatchSourceType {
+  PURCHASE_RECEIPT
+  ADJUSTMENT
+  RETUR_TANPA_REFERENSI
+  SUPPLIER_REPLACEMENT
+}
+
+enum StockPool {
+  SELLABLE
+  DAMAGED
+}
+
+enum StockMovementType {
+  PENERIMAAN_PEMBELIAN
+  PENJUALAN
+  PEMBATALAN_PENJUALAN
+  RETUR_LAYAK_JUAL
+  RETUR_RUSAK
+  RETUR_SUPPLIER
+  PENGGANTI_RETUR_SUPPLIER
+  PENYESUAIAN_STOK
+  PENGHAPUSAN_STOK
+}
+
+enum SaleOrderStatus {
+  Baru
+  Diproses
+  Selesai
+  Dibatalkan
+}
+
+enum SalePaymentStatus {
+  Belum_dibayar
+  Dibayar
+  Dikembalikan
+}
+
+enum SaleSettlementStatus {
+  Belum_cair
+  Sebagian_cair
+  Sudah_cair
+  Tidak_dicairkan
+}
+
+enum SaleStatusGroup {
+  ORDER
+  PAYMENT
+  SETTLEMENT
+}
+
+enum ReversalType {
+  CANCELLATION
+  CUSTOMER_RETURN
+}
+
+enum ReturnCondition {
+  Layak_jual
+  Rusak
+}
+
+enum ReturnClaimStatus {
+  Belum_diajukan
+  Dalam_proses
+  Disetujui
+  Ditolak
+}
+
+enum ReturnFundStatus {
+  Belum_diproses
+  Menunggu_pengembalian_dana
+  Dana_dikembalikan
+  Dana_tetap_hak_penjual
+  Belum_dapat_dipastikan
+}
+
+enum ReturnStatusGroup {
+  CLAIM
+  FUND
+}
+
+enum WriteOffSourceType {
+  FROM_RETURN_DAMAGED
+  FROM_ACTIVE_STOCK
+}
+
+enum PackagingMovementType {
+  PEMBELIAN
+  PEMAKAIAN_PENJUALAN
+  PEMBATALAN_PENJUALAN
+  PENYESUAIAN_STOK
+}
+
+// ============================================================================
+// A. AUTH DAN SISTEM (4 ENTITAS)
+// ============================================================================
+
+model Users {
+  id            String   @id @default(uuid()) @db.Uuid
+  username      String   @unique
+  password_hash String
+  role          UserRole @default(PENGELOLA)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  sessions                                 Sessions[]
+  activity_logs                            ActivityLogs[]
+  purchases_created                        Purchases[]                        @relation("PurchaseCreatedBy")
+  goods_receipts_created                   GoodsReceipts[]                    @relation("GoodsReceiptCreatedBy")
+  supplier_payments_created                SupplierPayments[]                 @relation("SupplierPaymentCreatedBy")
+  supplier_payments_voided                 SupplierPayments[]                 @relation("SupplierPaymentVoidedBy")
+  supplier_returns_created                 SupplierReturns[]                  @relation("SupplierReturnCreatedBy")
+  stock_movements_created                  StockMovements[]                   @relation("StockMovementCreatedBy")
+  sales_created                            Sales[]                            @relation("SaleCreatedBy")
+  reversals_created                        SaleItemBatchAllocationReversals[] @relation("ReversalCreatedBy")
+  sale_status_histories_created            SaleStatusHistories[]              @relation("SaleStatusHistoryCreatedBy")
+  sale_payments_created                    SalePayments[]                     @relation("SalePaymentCreatedBy")
+  sale_payments_voided                     SalePayments[]                     @relation("SalePaymentVoidedBy")
+  marketplace_settlements_created          MarketplaceSettlements[]           @relation("MarketplaceSettlementCreatedBy")
+  marketplace_settlements_voided           MarketplaceSettlements[]           @relation("MarketplaceSettlementVoidedBy")
+  customer_returns_created                 CustomerReturns[]                  @relation("CustomerReturnCreatedBy")
+  customer_return_status_histories_created CustomerReturnStatusHistories[]    @relation("CustomerReturnStatusHistoryCreatedBy")
+  stock_writeoffs_created                  StockWriteOffs[]                   @relation("StockWriteOffCreatedBy")
+  expenses_created                         Expenses[]                         @relation("ExpenseCreatedBy")
+  expenses_voided                          Expenses[]                         @relation("ExpenseVoidedBy")
+  packaging_purchases_created              PackagingPurchases[]               @relation("PackagingPurchaseCreatedBy")
+  packaging_movements_created              PackagingMovements[]               @relation("PackagingMovementCreatedBy")
+}
+
+model Sessions {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  token_hash String   @unique
+  expires_at DateTime @db.Timestamptz
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  user Users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@index([user_id])
+}
+
+model BusinessSettings {
+  id                      String   @id @default(uuid()) @db.Uuid
+  business_name           String
+  address                 String?
+  phone                   String?
+  default_admin_fee_rate  Decimal  @default(22.00) @db.Decimal(5, 2)
+  session_timeout_minutes Int      @default(60)
+  updated_at              DateTime @default(now()) @updatedAt @db.Timestamptz
+}
+
+model ActivityLogs {
+  id            String   @id @default(uuid()) @db.Uuid
+  entity_type   String
+  entity_id     String   @db.Uuid
+  action        String
+  details       Json?
+  created_by_id String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  created_by Users @relation(fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([created_by_id])
+  @@index([entity_type, entity_id])
+}
+
+// ============================================================================
+// B. PRODUK, KANAL & SUPPLIER (8 ENTITAS)
+// ============================================================================
+
+model ProductCategories {
+  id        String  @id @default(uuid()) @db.Uuid
+  name      String  @unique
+  is_active Boolean @default(true)
+
+  products Products[]
+}
+
+model Products {
+  id          String   @id @default(uuid()) @db.Uuid
+  category_id String   @db.Uuid
+  name        String
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz
+
+  category ProductCategories @relation(fields: [category_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  variants ProductVariants[]
+
+  @@index([category_id])
+}
+
+model Units {
+  id             String  @id @default(uuid()) @db.Uuid
+  name           String  @unique
+  allow_decimal  Boolean @default(false)
+  decimal_places Int     @default(0)
+  is_active      Boolean @default(true)
+
+  product_variants                  ProductVariants[]
+  packaging_materials_purchase_unit PackagingMaterials[] @relation("PackagingPurchaseUnit")
+  packaging_materials_usage_unit    PackagingMaterials[] @relation("PackagingUsageUnit")
+}
+
+model ProductVariants {
+  id                    String   @id @default(uuid()) @db.Uuid
+  product_id            String   @db.Uuid
+  unit_id               String   @db.Uuid
+  name                  String
+  barcode               String?  @unique
+  default_selling_price BigInt
+  stock_qty             Decimal  @default(0) @db.Decimal(12, 4)
+  damaged_stock_qty     Decimal  @default(0) @db.Decimal(12, 4)
+  min_stock             Decimal? @db.Decimal(12, 4)
+  is_active             Boolean  @default(true)
+  created_at            DateTime @default(now()) @db.Timestamptz
+
+  product Products @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  unit    Units    @relation(fields: [unit_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  channel_prices        VariantChannelPrices[]
+  variant_suppliers     VariantSuppliers[]
+  purchase_items        PurchaseItems[]
+  goods_receipt_items   GoodsReceiptItems[]
+  supplier_return_items SupplierReturnItems[]
+  stock_batches         StockBatches[]
+  stock_movements       StockMovements[]
+  sale_items            SaleItems[]
+  customer_return_items CustomerReturnItems[]
+  stock_writeoffs       StockWriteOffs[]
+
+  @@index([product_id])
+  @@index([unit_id])
+}
+
+model SalesChannels {
+  id             String  @id @default(uuid()) @db.Uuid
+  name           String  @unique
+  is_marketplace Boolean @default(false)
+  is_active      Boolean @default(true)
+
+  variant_channel_prices VariantChannelPrices[]
+  sales                  Sales[]
+}
+
+model VariantChannelPrices {
+  id               String @id @default(uuid()) @db.Uuid
+  variant_id       String @db.Uuid
+  sales_channel_id String @db.Uuid
+  selling_price    BigInt
+
+  variant       ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sales_channel SalesChannels   @relation(fields: [sales_channel_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([variant_id, sales_channel_id])
+  @@index([sales_channel_id])
+}
+
+model Suppliers {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  phone      String
+  address    String?
+  notes      String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  variant_suppliers VariantSuppliers[]
+  purchases         Purchases[]
+}
+
+model VariantSuppliers {
+  id             String @id @default(uuid()) @db.Uuid
+  variant_id     String @db.Uuid
+  supplier_id    String @db.Uuid
+  purchase_price BigInt
+
+  variant  ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supplier Suppliers       @relation(fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([variant_id, supplier_id])
+  @@index([supplier_id])
+}
+
+// ============================================================================
+// C. PEMBELIAN & RETUR SUPPLIER (7 ENTITAS)
+// ============================================================================
+
+model Purchases {
+  id               String         @id @default(uuid()) @db.Uuid
+  purchase_number  String         @unique
+  supplier_id      String         @db.Uuid
+  purchase_date    DateTime       @db.Timestamptz
+  payment_type     PaymentType
+  due_date         DateTime?      @db.Timestamptz
+  total_amount     BigInt
+  paid_amount      BigInt         @default(0)
+  remaining_amount BigInt
+  status           PurchaseStatus @default(Draf)
+  payment_status   PaymentStatus  @default(Belum_dibayar)
+  notes            String?
+  created_by_id    String         @db.Uuid
+  created_at       DateTime       @default(now()) @db.Timestamptz
+
+  supplier   Suppliers @relation(fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users     @relation("PurchaseCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  items             PurchaseItems[]
+  goods_receipts    GoodsReceipts[]
+  supplier_payments SupplierPayments[]
+  supplier_returns  SupplierReturns[]
+
+  @@index([supplier_id])
+  @@index([created_by_id])
+}
+
+model PurchaseItems {
+  id           String  @id @default(uuid()) @db.Uuid
+  purchase_id  String  @db.Uuid
+  variant_id   String  @db.Uuid
+  ordered_qty  Decimal @db.Decimal(12, 4)
+  received_qty Decimal @default(0) @db.Decimal(12, 4)
+  unit_price   BigInt
+
+  purchase Purchases       @relation(fields: [purchase_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  variant  ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  goods_receipt_items GoodsReceiptItems[]
+
+  @@index([purchase_id])
+  @@index([variant_id])
+}
+
+model GoodsReceipts {
+  id             String   @id @default(uuid()) @db.Uuid
+  receipt_number String   @unique
+  purchase_id    String   @db.Uuid
+  received_at    DateTime @db.Timestamptz
+  notes          String?
+  created_by_id  String   @db.Uuid
+  created_at     DateTime @default(now()) @db.Timestamptz
+
+  purchase   Purchases @relation(fields: [purchase_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users     @relation("GoodsReceiptCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  items GoodsReceiptItems[]
+
+  @@index([purchase_id])
+  @@index([created_by_id])
+}
+
+model GoodsReceiptItems {
+  id               String  @id @default(uuid()) @db.Uuid
+  goods_receipt_id String  @db.Uuid
+  purchase_item_id String  @db.Uuid
+  variant_id       String  @db.Uuid
+  received_qty     Decimal @db.Decimal(12, 4)
+
+  goods_receipt GoodsReceipts   @relation(fields: [goods_receipt_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  purchase_item PurchaseItems   @relation(fields: [purchase_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  variant       ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  stock_batch           StockBatches?
+  supplier_return_items SupplierReturnItems[]
+
+  @@index([goods_receipt_id])
+  @@index([purchase_item_id])
+  @@index([variant_id])
+}
+
+model SupplierPayments {
+  id             String   @id @default(uuid()) @db.Uuid
+  purchase_id    String   @db.Uuid
+  payment_date   DateTime @db.Timestamptz
+  amount         BigInt
+  payment_method String
+  is_void        Boolean  @default(false)
+  void_reason    String?
+  voided_by_id   String?  @db.Uuid
+  created_by_id  String   @db.Uuid
+  created_at     DateTime @default(now()) @db.Timestamptz
+
+  purchase   Purchases @relation(fields: [purchase_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  voided_by  Users?    @relation("SupplierPaymentVoidedBy", fields: [voided_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users     @relation("SupplierPaymentCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([purchase_id])
+  @@index([voided_by_id])
+  @@index([created_by_id])
+}
+
+model SupplierReturns {
+  id                       String                   @id @default(uuid()) @db.Uuid
+  return_number            String                   @unique
+  purchase_id              String                   @db.Uuid
+  return_date              DateTime                 @db.Timestamptz
+  resolution_type          SupplierReturnResolution
+  calculated_return_amount BigInt
+  return_amount            BigInt
+  settlement_date          DateTime?                @db.Timestamptz
+  reason                   String
+  created_by_id            String                   @db.Uuid
+  created_at               DateTime                 @default(now()) @db.Timestamptz
+
+  purchase   Purchases @relation(fields: [purchase_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users     @relation("SupplierReturnCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  items               SupplierReturnItems[]
+  replacement_batches StockBatches[]
+
+  @@index([purchase_id])
+  @@index([created_by_id])
+}
+
+model SupplierReturnItems {
+  id                    String  @id @default(uuid()) @db.Uuid
+  supplier_return_id    String  @db.Uuid
+  goods_receipt_item_id String  @db.Uuid
+  batch_id              String  @db.Uuid
+  variant_id            String  @db.Uuid
+  qty                   Decimal @db.Decimal(12, 4)
+  unit_price            BigInt
+  subtotal              BigInt
+
+  supplier_return    SupplierReturns   @relation(fields: [supplier_return_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  goods_receipt_item GoodsReceiptItems @relation(fields: [goods_receipt_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  batch              StockBatches      @relation(fields: [batch_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  variant            ProductVariants   @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([supplier_return_id])
+  @@index([goods_receipt_item_id])
+  @@index([batch_id])
+  @@index([variant_id])
+}
+
+// ============================================================================
+// D. STOK FIFO DAN PENJUALAN (9 ENTITAS)
+// ============================================================================
+
+model StockBatches {
+  id                    String          @id @default(uuid()) @db.Uuid
+  variant_id            String          @db.Uuid
+  source_type           BatchSourceType
+  goods_receipt_item_id String?         @unique @db.Uuid
+  supplier_return_id    String?         @db.Uuid
+  received_at           DateTime        @db.Timestamptz
+  initial_qty           Decimal         @db.Decimal(12, 4)
+  remaining_qty         Decimal         @db.Decimal(12, 4)
+  unit_cost             BigInt
+
+  variant            ProductVariants    @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  goods_receipt_item GoodsReceiptItems? @relation(fields: [goods_receipt_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supplier_return    SupplierReturns?   @relation(fields: [supplier_return_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  stock_movements       StockMovements[]
+  sale_allocations      SaleItemBatchAllocations[]
+  supplier_return_items SupplierReturnItems[]
+  writeoff_allocations  StockWriteOffBatchAllocations[]
+
+  @@index([variant_id, received_at, id])
+  @@index([supplier_return_id])
+}
+
+model StockMovements {
+  id               String            @id @default(uuid()) @db.Uuid
+  variant_id       String            @db.Uuid
+  batch_id         String?           @db.Uuid
+  stock_pool       StockPool
+  movement_type    StockMovementType
+  qty_change       Decimal           @db.Decimal(12, 4)
+  balance_after    Decimal           @default(0) @db.Decimal(12, 4)
+  reference_type   String
+  reference_id     String            @db.Uuid
+  reference_number String
+  notes            String?
+  created_by_id    String            @db.Uuid
+  created_at       DateTime          @default(now()) @db.Timestamptz
+
+  variant    ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  batch      StockBatches?   @relation(fields: [batch_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users           @relation("StockMovementCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([variant_id])
+  @@index([batch_id])
+  @@index([created_by_id])
+  @@index([reference_type, reference_id])
+}
+
+model Sales {
+  id                        String               @id @default(uuid()) @db.Uuid
+  transaction_number        String               @unique
+  sales_channel_id          String               @db.Uuid
+  package_size_id           String?              @db.Uuid
+  external_order_number     String?
+  transaction_date          DateTime             @db.Timestamptz
+  subtotal_amount           BigInt
+  discount_amount           BigInt               @default(0)
+  additional_fee_amount     BigInt               @default(0)
+  total_amount              BigInt
+  admin_fee_estimate_rate   Decimal              @default(0) @db.Decimal(5, 2)
+  admin_fee_estimate_amount BigInt               @default(0)
+  admin_fee_actual_amount   BigInt?
+  order_status              SaleOrderStatus      @default(Baru)
+  payment_status            SalePaymentStatus    @default(Belum_dibayar)
+  settlement_status         SaleSettlementStatus @default(Belum_cair)
+  is_stock_deducted         Boolean              @default(false)
+  created_by_id             String               @db.Uuid
+  created_at                DateTime             @default(now()) @db.Timestamptz
+
+  sales_channel SalesChannels @relation(fields: [sales_channel_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  package_size  PackageSizes? @relation(fields: [package_size_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by    Users         @relation("SaleCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  items                   SaleItems[]
+  packaging_usages        SalePackagingUsages[]
+  status_histories        SaleStatusHistories[]
+  payments                SalePayments[]
+  marketplace_settlements MarketplaceSettlements[]
+  customer_returns        CustomerReturns[]
+
+  @@index([sales_channel_id])
+  @@index([package_size_id])
+  @@index([created_by_id])
+}
+
+model SaleItems {
+  id                 String  @id @default(uuid()) @db.Uuid
+  sale_id            String  @db.Uuid
+  variant_id         String  @db.Uuid
+  qty                Decimal @db.Decimal(12, 4)
+  unit_selling_price BigInt
+  discount_amount    BigInt  @default(0)
+  subtotal_amount    BigInt
+  total_hpp_fifo     BigInt  @default(0)
+
+  sale    Sales           @relation(fields: [sale_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  variant ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  batch_allocations     SaleItemBatchAllocations[]
+  customer_return_items CustomerReturnItems[]
+
+  @@index([sale_id])
+  @@index([variant_id])
+}
+
+model SaleItemBatchAllocations {
+  id              String  @id @default(uuid()) @db.Uuid
+  sale_item_id    String  @db.Uuid
+  batch_id        String  @db.Uuid
+  allocated_qty   Decimal @db.Decimal(12, 4)
+  reversed_qty    Decimal @default(0) @db.Decimal(12, 4)
+  batch_unit_cost BigInt
+
+  sale_item SaleItems    @relation(fields: [sale_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  batch     StockBatches @relation(fields: [batch_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  reversals SaleItemBatchAllocationReversals[]
+
+  @@index([sale_item_id])
+  @@index([batch_id])
+}
+
+model SaleItemBatchAllocationReversals {
+  id                      String       @id @default(uuid()) @db.Uuid
+  allocation_id           String       @db.Uuid
+  reversal_type           ReversalType
+  sale_status_history_id  String?      @db.Uuid
+  customer_return_item_id String?      @db.Uuid
+  reversed_qty            Decimal      @db.Decimal(12, 4)
+  created_by_id           String       @db.Uuid
+  created_at              DateTime     @default(now()) @db.Timestamptz
+
+  allocation           SaleItemBatchAllocations @relation(fields: [allocation_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sale_status_history  SaleStatusHistories?     @relation(fields: [sale_status_history_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  customer_return_item CustomerReturnItems?     @relation(fields: [customer_return_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by           Users                    @relation("ReversalCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([allocation_id])
+  @@index([sale_status_history_id])
+  @@index([customer_return_item_id])
+  @@index([created_by_id])
+}
+
+model SaleStatusHistories {
+  id            String          @id @default(uuid()) @db.Uuid
+  sale_id       String          @db.Uuid
+  status_group  SaleStatusGroup
+  old_status    String?
+  new_status    String
+  reason        String?
+  created_by_id String          @db.Uuid
+  created_at    DateTime        @default(now()) @db.Timestamptz
+
+  sale       Sales @relation(fields: [sale_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users @relation("SaleStatusHistoryCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  reversals SaleItemBatchAllocationReversals[]
+
+  @@index([sale_id])
+  @@index([created_by_id])
+}
+
+model SalePayments {
+  id             String   @id @default(uuid()) @db.Uuid
+  sale_id        String   @db.Uuid
+  payment_date   DateTime @db.Timestamptz
+  amount         BigInt
+  payment_method String
+  is_void        Boolean  @default(false)
+  void_reason    String?
+  voided_by_id   String?  @db.Uuid
+  created_by_id  String   @db.Uuid
+  created_at     DateTime @default(now()) @db.Timestamptz
+
+  sale       Sales  @relation(fields: [sale_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  voided_by  Users? @relation("SalePaymentVoidedBy", fields: [voided_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users  @relation("SalePaymentCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([sale_id])
+  @@index([voided_by_id])
+  @@index([created_by_id])
+}
+
+model MarketplaceSettlements {
+  id              String   @id @default(uuid()) @db.Uuid
+  sale_id         String   @db.Uuid
+  settlement_date DateTime @db.Timestamptz
+  amount          BigInt
+  notes           String?
+  is_void         Boolean  @default(false)
+  void_reason     String?
+  voided_by_id    String?  @db.Uuid
+  created_by_id   String   @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  sale       Sales  @relation(fields: [sale_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  voided_by  Users? @relation("MarketplaceSettlementVoidedBy", fields: [voided_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users  @relation("MarketplaceSettlementCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([sale_id])
+  @@index([voided_by_id])
+  @@index([created_by_id])
+}
+
+// ============================================================================
+// E. RETUR PELANGGAN DAN PENGELUARAN (7 ENTITAS)
+// ============================================================================
+
+model CustomerReturns {
+  id               String            @id @default(uuid()) @db.Uuid
+  return_number    String            @unique
+  original_sale_id String?           @db.Uuid
+  return_date      DateTime          @db.Timestamptz
+  reason           String
+  claim_status     ReturnClaimStatus @default(Belum_diajukan)
+  fund_status      ReturnFundStatus  @default(Belum_diproses)
+  refund_amount    BigInt            @default(0)
+  refund_paid_date DateTime?         @db.Timestamptz
+  created_by_id    String            @db.Uuid
+  created_at       DateTime          @default(now()) @db.Timestamptz
+
+  original_sale Sales? @relation(fields: [original_sale_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by    Users  @relation("CustomerReturnCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  items            CustomerReturnItems[]
+  status_histories CustomerReturnStatusHistories[]
+
+  @@index([original_sale_id])
+  @@index([created_by_id])
+}
+
+model CustomerReturnItems {
+  id                  String          @id @default(uuid()) @db.Uuid
+  customer_return_id  String          @db.Uuid
+  sale_item_id        String?         @db.Uuid
+  variant_id          String          @db.Uuid
+  qty                 Decimal         @db.Decimal(12, 4)
+  condition           ReturnCondition
+  restored_hpp_amount BigInt          @default(0)
+
+  customer_return CustomerReturns @relation(fields: [customer_return_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sale_item       SaleItems?      @relation(fields: [sale_item_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  variant         ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  reversals SaleItemBatchAllocationReversals[]
+
+  @@index([customer_return_id])
+  @@index([sale_item_id])
+  @@index([variant_id])
+}
+
+model CustomerReturnStatusHistories {
+  id                 String            @id @default(uuid()) @db.Uuid
+  customer_return_id String            @db.Uuid
+  status_group       ReturnStatusGroup
+  old_status         String?
+  new_status         String
+  notes              String?
+  created_by_id      String            @db.Uuid
+  created_at         DateTime          @default(now()) @db.Timestamptz
+
+  customer_return CustomerReturns @relation(fields: [customer_return_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by      Users           @relation("CustomerReturnStatusHistoryCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([customer_return_id])
+  @@index([created_by_id])
+}
+
+model StockWriteOffs {
+  id              String             @id @default(uuid()) @db.Uuid
+  writeoff_number String             @unique
+  variant_id      String             @db.Uuid
+  source_type     WriteOffSourceType
+  qty             Decimal            @db.Decimal(12, 4)
+  loss_value      BigInt             @default(0)
+  reason          String
+  created_by_id   String             @db.Uuid
+  created_at      DateTime           @default(now()) @db.Timestamptz
+
+  variant    ProductVariants @relation(fields: [variant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by Users           @relation("StockWriteOffCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  batch_allocations StockWriteOffBatchAllocations[]
+
+  @@index([variant_id])
+  @@index([created_by_id])
+}
+
+model StockWriteOffBatchAllocations {
+  id                String  @id @default(uuid()) @db.Uuid
+  stock_writeoff_id String  @db.Uuid
+  batch_id          String  @db.Uuid
+  deducted_qty      Decimal @db.Decimal(12, 4)
+  batch_unit_cost   BigInt
+
+  stock_writeoff StockWriteOffs @relation(fields: [stock_writeoff_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  batch          StockBatches   @relation(fields: [batch_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([stock_writeoff_id])
+  @@index([batch_id])
+}
+
+model ExpenseCategories {
+  id        String  @id @default(uuid()) @db.Uuid
+  name      String  @unique
+  is_active Boolean @default(true)
+
+  expenses Expenses[]
+}
+
+model Expenses {
+  id                  String   @id @default(uuid()) @db.Uuid
+  expense_category_id String   @db.Uuid
+  expense_date        DateTime @db.Timestamptz
+  amount              BigInt
+  description         String
+  is_void             Boolean  @default(false)
+  void_reason         String?
+  voided_by_id        String?  @db.Uuid
+  created_by_id       String   @db.Uuid
+  created_at          DateTime @default(now()) @db.Timestamptz
+
+  expense_category ExpenseCategories @relation(fields: [expense_category_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  voided_by        Users?            @relation("ExpenseVoidedBy", fields: [voided_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by       Users             @relation("ExpenseCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([expense_category_id])
+  @@index([voided_by_id])
+  @@index([created_by_id])
+}
+
+// ============================================================================
+// F. PERLENGKAPAN KEMASAN & STANDAR UKURAN PAKET (7 ENTITAS)
+// ============================================================================
+
+model PackagingMaterials {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String   @unique
+  purchase_unit_id  String   @db.Uuid
+  usage_unit_id     String   @db.Uuid
+  conversion_factor Decimal  @db.Decimal(12, 4)
+  stock_qty         Decimal  @default(0) @db.Decimal(12, 4)
+  min_stock         Decimal? @db.Decimal(12, 4)
+  average_unit_cost Decimal  @default(0) @db.Decimal(12, 4)
+  is_active         Boolean  @default(true)
+
+  purchase_unit Units @relation("PackagingPurchaseUnit", fields: [purchase_unit_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  usage_unit    Units @relation("PackagingUsageUnit", fields: [usage_unit_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  package_size_items       PackageSizeItems[]
+  packaging_purchase_items PackagingPurchaseItems[]
+  packaging_movements      PackagingMovements[]
+  sale_packaging_usages    SalePackagingUsages[]
+
+  @@index([purchase_unit_id])
+  @@index([usage_unit_id])
+}
+
+model PackageSizes {
+  id              String  @id @default(uuid()) @db.Uuid
+  name            String  @unique
+  dimension_label String?
+  sort_order      Int     @default(0)
+  is_active       Boolean @default(true)
+
+  items PackageSizeItems[]
+  sales Sales[]
+}
+
+model PackageSizeItems {
+  id                    String  @id @default(uuid()) @db.Uuid
+  package_size_id       String  @db.Uuid
+  packaging_material_id String  @db.Uuid
+  default_usage_qty     Decimal @db.Decimal(12, 4)
+
+  package_size       PackageSizes       @relation(fields: [package_size_id], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  packaging_material PackagingMaterials @relation(fields: [packaging_material_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([package_size_id, packaging_material_id])
+  @@index([packaging_material_id])
+}
+
+model PackagingPurchases {
+  id              String   @id @default(uuid()) @db.Uuid
+  purchase_number String   @unique
+  purchase_date   DateTime @db.Timestamptz
+  total_amount    BigInt
+  notes           String?
+  created_by_id   String   @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  created_by Users @relation("PackagingPurchaseCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  items PackagingPurchaseItems[]
+
+  @@index([created_by_id])
+}
+
+model PackagingPurchaseItems {
+  id                    String  @id @default(uuid()) @db.Uuid
+  packaging_purchase_id String  @db.Uuid
+  packaging_material_id String  @db.Uuid
+  purchase_qty          Decimal @db.Decimal(12, 4)
+  converted_usage_qty   Decimal @db.Decimal(12, 4)
+  unit_price            BigInt
+  subtotal              BigInt
+
+  packaging_purchase PackagingPurchases @relation(fields: [packaging_purchase_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  packaging_material PackagingMaterials @relation(fields: [packaging_material_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([packaging_purchase_id])
+  @@index([packaging_material_id])
+}
+
+model PackagingMovements {
+  id                    String                @id @default(uuid()) @db.Uuid
+  packaging_material_id String                @db.Uuid
+  movement_type         PackagingMovementType
+  qty_change            Decimal               @db.Decimal(12, 4)
+  reference_type        String
+  reference_id          String                @db.Uuid
+  reference_number      String
+  created_by_id         String                @db.Uuid
+  created_at            DateTime              @default(now()) @db.Timestamptz
+
+  packaging_material PackagingMaterials @relation(fields: [packaging_material_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_by         Users              @relation("PackagingMovementCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([packaging_material_id])
+  @@index([created_by_id])
+  @@index([reference_type, reference_id])
+}
+
+model SalePackagingUsages {
+  id                    String  @id @default(uuid()) @db.Uuid
+  sale_id               String  @db.Uuid
+  packaging_material_id String  @db.Uuid
+  standard_usage_qty    Decimal @default(0) @db.Decimal(12, 4)
+  actual_usage_qty      Decimal @db.Decimal(12, 4)
+  unit_cost_snapshot    Decimal @db.Decimal(12, 4)
+  calculated_hpp        BigInt
+  adjusted_hpp          BigInt?
+  is_stock_deducted     Boolean @default(false)
+  is_stock_restored     Boolean @default(false)
+
+  sale               Sales              @relation(fields: [sale_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  packaging_material PackagingMaterials @relation(fields: [packaging_material_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([sale_id])
+  @@index([packaging_material_id])
 }

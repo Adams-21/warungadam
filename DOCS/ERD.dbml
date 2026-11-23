@@ -1,0 +1,854 @@
+// ============================================================================
+// BIZMANAGE ERD - DATABASE MARKUP LANGUAGE (DBML)
+// Versi Acuan : SRS BizManage v1.2 (42 Entitas)
+// DBMS Target : PostgreSQL
+// ============================================================================
+
+Project BizManage {
+  database_type: 'PostgreSQL'
+  Note: 'Sistem Manajemen Keuangan dan Operasional Usaha Reseller (42 Entitas)'
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+Enum UserRole {
+  PENGELOLA
+}
+
+Enum PaymentType {
+  TUNAI
+  TEMPO
+}
+
+Enum PurchaseStatus {
+  Draf
+  Dikonfirmasi
+  Diterima_sebagian
+  Diterima_seluruhnya
+  Dibatalkan
+}
+
+Enum PaymentStatus {
+  Belum_dibayar
+  Sebagian
+  Lunas
+}
+
+Enum SupplierReturnResolution {
+  PENGEMBALIAN_UANG
+  BARANG_PENGGANTI
+  POTONGAN_TAGIHAN
+}
+
+Enum BatchSourceType {
+  PURCHASE_RECEIPT
+  ADJUSTMENT
+  RETUR_TANPA_REFERENSI
+  SUPPLIER_REPLACEMENT
+}
+
+Enum StockPool {
+  SELLABLE
+  DAMAGED
+}
+
+Enum StockMovementType {
+  PENERIMAAN_PEMBELIAN
+  PENJUALAN
+  PEMBATALAN_PENJUALAN
+  RETUR_LAYAK_JUAL
+  RETUR_RUSAK
+  RETUR_SUPPLIER
+  PENGGANTI_RETUR_SUPPLIER
+  PENYESUAIAN_STOK
+  PENGHAPUSAN_STOK
+}
+
+Enum SaleOrderStatus {
+  Baru
+  Diproses
+  Selesai
+  Dibatalkan
+}
+
+Enum SalePaymentStatus {
+  Belum_dibayar
+  Dibayar
+  Dikembalikan
+}
+
+Enum SaleSettlementStatus {
+  Belum_cair
+  Sebagian_cair
+  Sudah_cair
+  Tidak_dicairkan
+}
+
+Enum SaleStatusGroup {
+  ORDER
+  PAYMENT
+  SETTLEMENT
+}
+
+Enum ReversalType {
+  CANCELLATION
+  CUSTOMER_RETURN
+}
+
+Enum ReturnCondition {
+  Layak_jual
+  Rusak
+}
+
+Enum ReturnClaimStatus {
+  Belum_diajukan
+  Dalam_proses
+  Disetujui
+  Ditolak
+}
+
+Enum ReturnFundStatus {
+  Belum_diproses
+  Menunggu_pengembalian_dana
+  Dana_dikembalikan
+  Dana_tetap_hak_penjual
+  Belum_dapat_dipastikan
+}
+
+Enum ReturnStatusGroup {
+  CLAIM
+  FUND
+}
+
+Enum WriteOffSourceType {
+  FROM_RETURN_DAMAGED
+  FROM_ACTIVE_STOCK
+}
+
+Enum PackagingMovementType {
+  PEMBELIAN
+  PEMAKAIAN_PENJUALAN
+  PEMBATALAN_PENJUALAN
+  PENYESUAIAN_STOK
+}
+
+// ============================================================================
+// A. AUTH DAN SISTEM (4 ENTITAS)
+// ============================================================================
+
+Table Users {
+  id uuid [pk]
+  username varchar [unique, not null]
+  password_hash varchar [not null]
+  role UserRole [not null, default: 'PENGELOLA']
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table Sessions {
+  id uuid [pk]
+  user_id uuid [not null, ref: > Users.id] // ON DELETE CASCADE
+  token_hash varchar [unique, not null]
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id
+  }
+}
+
+Table BusinessSettings {
+  id uuid [pk]
+  business_name varchar [not null]
+  address text
+  phone varchar
+  default_admin_fee_rate decimal(5,2) [not null, default: 22.00, note: 'CHECK (0..100)']
+  session_timeout_minutes int [not null, default: 60]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table ActivityLogs {
+  id uuid [pk]
+  entity_type varchar [not null]
+  entity_id uuid [not null]
+  action varchar [not null]
+  details jsonb
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    created_by_id
+    (entity_type, entity_id)
+  }
+}
+
+// ============================================================================
+// B. PRODUK, KANAL & SUPPLIER (8 ENTITAS)
+// ============================================================================
+
+Table ProductCategories {
+  id uuid [pk]
+  name varchar [unique, not null]
+  is_active boolean [not null, default: true]
+}
+
+Table Products {
+  id uuid [pk]
+  category_id uuid [not null, ref: > ProductCategories.id]
+  name varchar [not null]
+  description text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    category_id
+  }
+}
+
+Table Units {
+  id uuid [pk]
+  name varchar [unique, not null]
+  allow_decimal boolean [not null, default: false]
+  decimal_places int [not null, default: 0]
+  is_active boolean [not null, default: true]
+}
+
+Table ProductVariants {
+  id uuid [pk]
+  product_id uuid [not null, ref: > Products.id]
+  unit_id uuid [not null, ref: > Units.id]
+  name varchar [not null]
+  barcode varchar [unique]
+  default_selling_price bigint [not null]
+  stock_qty decimal(12,4) [not null, default: 0, note: 'CHECK >= 0 menunggu TBD-09']
+  damaged_stock_qty decimal(12,4) [not null, default: 0, note: 'CHECK >= 0']
+  min_stock decimal(12,4)
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    product_id
+    unit_id
+  }
+}
+
+Table SalesChannels {
+  id uuid [pk]
+  name varchar [unique, not null]
+  is_marketplace boolean [not null, default: false, note: 'True = berlaku estimasi biaya admin 22%']
+  is_active boolean [not null, default: true]
+}
+
+Table VariantChannelPrices {
+  id uuid [pk]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  sales_channel_id uuid [not null, ref: > SalesChannels.id]
+  selling_price bigint [not null]
+
+  indexes {
+    (variant_id, sales_channel_id) [unique]
+    sales_channel_id
+  }
+}
+
+Table Suppliers {
+  id uuid [pk]
+  name varchar [not null]
+  phone varchar [not null]
+  address text
+  notes text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table VariantSuppliers {
+  id uuid [pk]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  supplier_id uuid [not null, ref: > Suppliers.id]
+  purchase_price bigint [not null, note: 'Harga beli acuan sementara (TBD-25)']
+
+  indexes {
+    (variant_id, supplier_id) [unique]
+    supplier_id
+  }
+}
+
+// ============================================================================
+// C. PEMBELIAN & RETUR SUPPLIER (7 ENTITAS)
+// ============================================================================
+
+Table Purchases {
+  id uuid [pk]
+  purchase_number varchar [unique, not null]
+  supplier_id uuid [not null, ref: > Suppliers.id]
+  purchase_date timestamptz [not null]
+  payment_type PaymentType [not null]
+  due_date timestamptz
+  total_amount bigint [not null]
+  paid_amount bigint [not null, default: 0]
+  remaining_amount bigint [not null]
+  status PurchaseStatus [not null, default: 'Draf']
+  payment_status PaymentStatus [not null, default: 'Belum_dibayar']
+  notes text
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    supplier_id
+    created_by_id
+  }
+}
+
+Table PurchaseItems {
+  id uuid [pk]
+  purchase_id uuid [not null, ref: > Purchases.id]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  ordered_qty decimal(12,4) [not null, note: 'CHECK > 0']
+  received_qty decimal(12,4) [not null, default: 0]
+  unit_price bigint [not null]
+
+  indexes {
+    purchase_id
+    variant_id
+  }
+}
+
+Table GoodsReceipts {
+  id uuid [pk]
+  receipt_number varchar [unique, not null]
+  purchase_id uuid [not null, ref: > Purchases.id]
+  received_at timestamptz [not null]
+  notes text
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    purchase_id
+    created_by_id
+  }
+}
+
+Table GoodsReceiptItems {
+  id uuid [pk]
+  goods_receipt_id uuid [not null, ref: > GoodsReceipts.id]
+  purchase_item_id uuid [not null, ref: > PurchaseItems.id]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  received_qty decimal(12,4) [not null, note: 'CHECK > 0']
+
+  indexes {
+    goods_receipt_id
+    purchase_item_id
+    variant_id
+  }
+}
+
+Table SupplierPayments {
+  id uuid [pk]
+  purchase_id uuid [not null, ref: > Purchases.id]
+  payment_date timestamptz [not null]
+  amount bigint [not null, note: 'CHECK > 0']
+  payment_method varchar [not null]
+  is_void boolean [not null, default: false]
+  void_reason text
+  voided_by_id uuid [ref: > Users.id]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    purchase_id
+    voided_by_id
+    created_by_id
+  }
+}
+
+Table SupplierReturns {
+  id uuid [pk]
+  return_number varchar [unique, not null]
+  purchase_id uuid [not null, ref: > Purchases.id]
+  return_date timestamptz [not null]
+  resolution_type SupplierReturnResolution [not null]
+  calculated_return_amount bigint [not null]
+  return_amount bigint [not null, note: 'CHECK >= 0']
+  settlement_date timestamptz
+  reason text [not null]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    purchase_id
+    created_by_id
+  }
+}
+
+Table SupplierReturnItems {
+  id uuid [pk]
+  supplier_return_id uuid [not null, ref: > SupplierReturns.id]
+  goods_receipt_item_id uuid [not null, ref: > GoodsReceiptItems.id]
+  batch_id uuid [not null, ref: > StockBatches.id]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  qty decimal(12,4) [not null, note: 'CHECK > 0']
+  unit_price bigint [not null]
+  subtotal bigint [not null]
+
+  indexes {
+    supplier_return_id
+    goods_receipt_item_id
+    batch_id
+    variant_id
+  }
+}
+
+// ============================================================================
+// D. STOK FIFO DAN PENJUALAN (9 ENTITAS)
+// ============================================================================
+
+Table StockBatches {
+  id uuid [pk]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  source_type BatchSourceType [not null]
+  goods_receipt_item_id uuid [unique, ref: - GoodsReceiptItems.id]
+  supplier_return_id uuid [ref: > SupplierReturns.id]
+  received_at timestamptz [not null]
+  initial_qty decimal(12,4) [not null, note: 'CHECK > 0']
+  remaining_qty decimal(12,4) [not null, note: 'CHECK >= 0 AND <= initial_qty']
+  unit_cost bigint [not null, note: 'CHECK >= 0']
+
+  indexes {
+    (variant_id, received_at, id)
+    supplier_return_id
+  }
+}
+
+Table StockMovements {
+  id uuid [pk]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  batch_id uuid [ref: > StockBatches.id, note: 'Wajib terisi jika stock_pool = SELLABLE']
+  stock_pool StockPool [not null]
+  movement_type StockMovementType [not null]
+  qty_change decimal(12,4) [not null]
+  reference_type varchar [not null]
+  reference_id uuid [not null]
+  reference_number varchar [not null]
+  notes text
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    variant_id
+    batch_id
+    created_by_id
+    (reference_type, reference_id)
+  }
+}
+
+Table Sales {
+  id uuid [pk]
+  transaction_number varchar [unique, not null]
+  sales_channel_id uuid [not null, ref: > SalesChannels.id]
+  package_size_id uuid [ref: > PackageSizes.id]
+  external_order_number varchar
+  transaction_date timestamptz [not null]
+  subtotal_amount bigint [not null]
+  discount_amount bigint [not null, default: 0]
+  additional_fee_amount bigint [not null, default: 0]
+  total_amount bigint [not null]
+  admin_fee_estimate_rate decimal(5,2) [not null, default: 0]
+  admin_fee_estimate_amount bigint [not null, default: 0]
+  admin_fee_actual_amount bigint [note: 'Evaluasi via IS NOT NULL; nilai 0 valid']
+  order_status SaleOrderStatus [not null, default: 'Baru']
+  payment_status SalePaymentStatus [not null, default: 'Belum_dibayar']
+  settlement_status SaleSettlementStatus [not null, default: 'Belum_cair']
+  is_stock_deducted boolean [not null, default: false]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    sales_channel_id
+    package_size_id
+    created_by_id
+  }
+}
+
+Table SaleItems {
+  id uuid [pk]
+  sale_id uuid [not null, ref: > Sales.id]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  qty decimal(12,4) [not null, note: 'CHECK > 0']
+  unit_selling_price bigint [not null]
+  discount_amount bigint [not null, default: 0]
+  subtotal_amount bigint [not null]
+  total_hpp_fifo bigint [not null, default: 0]
+
+  indexes {
+    sale_id
+    variant_id
+  }
+}
+
+Table SaleItemBatchAllocations {
+  id uuid [pk]
+  sale_item_id uuid [not null, ref: > SaleItems.id]
+  batch_id uuid [not null, ref: > StockBatches.id]
+  allocated_qty decimal(12,4) [not null, note: 'CHECK > 0']
+  reversed_qty decimal(12,4) [not null, default: 0, note: 'CHECK >= 0 AND <= allocated_qty']
+  batch_unit_cost bigint [not null]
+
+  indexes {
+    sale_item_id
+    batch_id
+  }
+}
+
+Table SaleItemBatchAllocationReversals {
+  id uuid [pk]
+  allocation_id uuid [not null, ref: > SaleItemBatchAllocations.id]
+  reversal_type ReversalType [not null]
+  sale_status_history_id uuid [ref: > SaleStatusHistories.id]
+  customer_return_item_id uuid [ref: > CustomerReturnItems.id]
+  reversed_qty decimal(12,4) [not null, note: 'CHECK > 0']
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    allocation_id
+    sale_status_history_id
+    customer_return_item_id
+    created_by_id
+  }
+}
+
+Table SaleStatusHistories {
+  id uuid [pk]
+  sale_id uuid [not null, ref: > Sales.id]
+  status_group SaleStatusGroup [not null]
+  old_status varchar
+  new_status varchar [not null]
+  reason text
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    sale_id
+    created_by_id
+  }
+}
+
+Table SalePayments {
+  id uuid [pk]
+  sale_id uuid [not null, ref: > Sales.id]
+  payment_date timestamptz [not null]
+  amount bigint [not null, note: 'CHECK > 0']
+  payment_method varchar [not null]
+  is_void boolean [not null, default: false]
+  void_reason text
+  voided_by_id uuid [ref: > Users.id]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    sale_id
+    voided_by_id
+    created_by_id
+  }
+}
+
+Table MarketplaceSettlements {
+  id uuid [pk]
+  sale_id uuid [not null, ref: > Sales.id]
+  settlement_date timestamptz [not null]
+  amount bigint [not null, note: 'CHECK > 0']
+  notes text
+  is_void boolean [not null, default: false]
+  void_reason text
+  voided_by_id uuid [ref: > Users.id]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    sale_id
+    voided_by_id
+    created_by_id
+  }
+}
+
+// ============================================================================
+// E. RETUR PELANGGAN DAN PENGELUARAN (7 ENTITAS)
+// ============================================================================
+
+Table CustomerReturns {
+  id uuid [pk]
+  return_number varchar [unique, not null]
+  original_sale_id uuid [ref: > Sales.id]
+  return_date timestamptz [not null]
+  reason text [not null]
+  claim_status ReturnClaimStatus [not null, default: 'Belum_diajukan']
+  fund_status ReturnFundStatus [not null, default: 'Belum_diproses']
+  refund_amount bigint [not null, default: 0]
+  refund_paid_date timestamptz
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    original_sale_id
+    created_by_id
+  }
+}
+
+Table CustomerReturnItems {
+  id uuid [pk]
+  customer_return_id uuid [not null, ref: > CustomerReturns.id]
+  sale_item_id uuid [ref: > SaleItems.id]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  qty decimal(12,4) [not null, note: 'CHECK > 0']
+  condition ReturnCondition [not null]
+  restored_hpp_amount bigint [not null, default: 0]
+
+  indexes {
+    customer_return_id
+    sale_item_id
+    variant_id
+  }
+}
+
+Table CustomerReturnStatusHistories {
+  id uuid [pk]
+  customer_return_id uuid [not null, ref: > CustomerReturns.id]
+  status_group ReturnStatusGroup [not null]
+  old_status varchar
+  new_status varchar [not null]
+  notes text
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    customer_return_id
+    created_by_id
+  }
+}
+
+Table StockWriteOffs {
+  id uuid [pk]
+  writeoff_number varchar [unique, not null]
+  variant_id uuid [not null, ref: > ProductVariants.id]
+  source_type WriteOffSourceType [not null]
+  qty decimal(12,4) [not null, note: 'CHECK > 0']
+  loss_value bigint [not null, default: 0]
+  reason text [not null]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    variant_id
+    created_by_id
+  }
+}
+
+Table StockWriteOffBatchAllocations {
+  id uuid [pk]
+  stock_writeoff_id uuid [not null, ref: > StockWriteOffs.id]
+  batch_id uuid [not null, ref: > StockBatches.id]
+  deducted_qty decimal(12,4) [not null, note: 'CHECK > 0']
+  batch_unit_cost bigint [not null]
+
+  indexes {
+    stock_writeoff_id
+    batch_id
+  }
+}
+
+Table ExpenseCategories {
+  id uuid [pk]
+  name varchar [unique, not null]
+  is_active boolean [not null, default: true]
+}
+
+Table Expenses {
+  id uuid [pk]
+  expense_category_id uuid [not null, ref: > ExpenseCategories.id]
+  expense_date timestamptz [not null]
+  amount bigint [not null, note: 'CHECK > 0']
+  description text [not null]
+  is_void boolean [not null, default: false]
+  void_reason text
+  voided_by_id uuid [ref: > Users.id]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    expense_category_id
+    voided_by_id
+    created_by_id
+  }
+}
+
+// ============================================================================
+// F. PERLENGKAPAN KEMASAN & STANDAR UKURAN PAKET (7 ENTITAS)
+// ============================================================================
+
+Table PackagingMaterials {
+  id uuid [pk]
+  name varchar [unique, not null]
+  purchase_unit_id uuid [not null, ref: > Units.id]
+  usage_unit_id uuid [not null, ref: > Units.id]
+  conversion_factor decimal(12,4) [not null, note: 'CHECK > 0']
+  stock_qty decimal(12,4) [not null, default: 0, note: 'CHECK >= 0 menunggu TBD-09']
+  min_stock decimal(12,4)
+  average_unit_cost decimal(12,4) [not null, default: 0]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    purchase_unit_id
+    usage_unit_id
+  }
+}
+
+Table PackageSizes {
+  id uuid [pk]
+  name varchar [unique, not null, note: 'Contoh: XS, S, M, L, XL, XXL']
+  dimension_label varchar [note: 'Contoh: 15 x 10 x 8 cm']
+  sort_order int [not null, default: 0]
+  is_active boolean [not null, default: true]
+}
+
+Table PackageSizeItems {
+  id uuid [pk]
+  package_size_id uuid [not null, ref: > PackageSizes.id] // ON DELETE CASCADE
+  packaging_material_id uuid [not null, ref: > PackagingMaterials.id]
+  default_usage_qty decimal(12,4) [not null, note: 'CHECK > 0']
+
+  indexes {
+    (package_size_id, packaging_material_id) [unique]
+    packaging_material_id
+  }
+}
+
+Table PackagingPurchases {
+  id uuid [pk]
+  purchase_number varchar [unique, not null]
+  purchase_date timestamptz [not null]
+  total_amount bigint [not null]
+  notes text
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    created_by_id
+  }
+}
+
+Table PackagingPurchaseItems {
+  id uuid [pk]
+  packaging_purchase_id uuid [not null, ref: > PackagingPurchases.id]
+  packaging_material_id uuid [not null, ref: > PackagingMaterials.id]
+  purchase_qty decimal(12,4) [not null, note: 'CHECK > 0']
+  converted_usage_qty decimal(12,4) [not null, note: 'CHECK > 0']
+  unit_price bigint [not null]
+  subtotal bigint [not null]
+
+  indexes {
+    packaging_purchase_id
+    packaging_material_id
+  }
+}
+
+Table PackagingMovements {
+  id uuid [pk]
+  packaging_material_id uuid [not null, ref: > PackagingMaterials.id]
+  movement_type PackagingMovementType [not null]
+  qty_change decimal(12,4) [not null]
+  reference_type varchar [not null]
+  reference_id uuid [not null]
+  reference_number varchar [not null]
+  created_by_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    packaging_material_id
+    created_by_id
+    (reference_type, reference_id)
+  }
+}
+
+Table SalePackagingUsages {
+  id uuid [pk]
+  sale_id uuid [not null, ref: > Sales.id]
+  packaging_material_id uuid [not null, ref: > PackagingMaterials.id]
+  standard_usage_qty decimal(12,4) [not null, default: 0]
+  actual_usage_qty decimal(12,4) [not null, note: 'CHECK >= 0']
+  unit_cost_snapshot decimal(12,4) [not null]
+  calculated_hpp bigint [not null]
+  adjusted_hpp bigint
+  is_stock_deducted boolean [not null, default: false]
+  is_stock_restored boolean [not null, default: false]
+
+  indexes {
+    sale_id
+    packaging_material_id
+  }
+}
+
+// ============================================================================
+// TABLE GROUPS (UNTUK PENGELOMPOKAN VISUAL DI DBDIAGRAM.IO)
+// ============================================================================
+
+TableGroup Auth_And_System {
+  Users
+  Sessions
+  BusinessSettings
+  ActivityLogs
+}
+
+TableGroup Products_And_Suppliers {
+  ProductCategories
+  Products
+  Units
+  ProductVariants
+  SalesChannels
+  VariantChannelPrices
+  Suppliers
+  VariantSuppliers
+}
+
+TableGroup Purchasing_And_Supplier_Returns {
+  Purchases
+  PurchaseItems
+  GoodsReceipts
+  GoodsReceiptItems
+  SupplierPayments
+  SupplierReturns
+  SupplierReturnItems
+}
+
+TableGroup Inventory_FIFO_And_Sales {
+  StockBatches
+  StockMovements
+  Sales
+  SaleItems
+  SaleItemBatchAllocations
+  SaleItemBatchAllocationReversals
+  SaleStatusHistories
+  SalePayments
+  MarketplaceSettlements
+}
+
+TableGroup Customer_Returns_And_Expenses {
+  CustomerReturns
+  CustomerReturnItems
+  CustomerReturnStatusHistories
+  StockWriteOffs
+  StockWriteOffBatchAllocations
+  ExpenseCategories
+  Expenses
+}
+
+TableGroup Packaging_And_Package_Sizes {
+  PackagingMaterials
+  PackageSizes
+  PackageSizeItems
+  PackagingPurchases
+  PackagingPurchaseItems
+  PackagingMovements
+  SalePackagingUsages
+}

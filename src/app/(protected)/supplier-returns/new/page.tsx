@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { PageHeading, Panel, secondaryButtonClass } from "@/components/ui";
+import {
+  EmptyState,
+  PageHeading,
+  Panel,
+  secondaryButtonClass,
+} from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { SupplierReturnResolution } from "@prisma/client";
 import { NewSupplierReturnForm } from "../new-supplier-return-form";
@@ -76,17 +81,18 @@ export default async function NewSupplierReturnPage() {
       <PageHeading
         title="Retur Supplier Baru"
         description="Kurangi batch penerimaan asal dan pilih penyelesaian: potong tagihan, pengembalian dana, atau barang pengganti."
+        actions={
+          <Link href="/supplier-returns" className={secondaryButtonClass}>
+            Kembali ke Daftar Retur Supplier
+          </Link>
+        }
       />
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/supplier-returns" className={secondaryButtonClass}>
-          Kembali ke Daftar Retur Supplier
-        </Link>
-      </div>
       <Panel title="Formulir Retur Supplier">
         {purchaseViews.length === 0 ? (
-          <p className="rounded-md border border-dashed border-zinc-300 p-4 text-sm text-zinc-500">
-            Belum ada penerimaan barang yang dapat diretur.
-          </p>
+          <EmptyState
+            compact
+            title="Belum ada penerimaan yang dapat diretur"
+          />
         ) : (
           <NewSupplierReturnForm
             purchases={purchaseViews}

@@ -1,7 +1,10 @@
 import { Prisma } from "@prisma/client";
 import {
+  DateRangeFields,
+  EmptyState,
   PageHeading,
   Panel,
+  StatusBadge,
   inputClass,
   primaryButtonClass,
 } from "@/components/ui";
@@ -245,6 +248,13 @@ export default async function ExpensesPage({
       <PageHeading
         title="Pengeluaran & Laba Bersih"
         description="Catat biaya operasional, pantau pengeluaran per kategori, dan lihat laba bersih periode terpilih."
+        actions={
+          <ExpenseFormModal
+            categories={activeCategories}
+            label="Tambah Pengeluaran"
+            className={primaryButtonClass}
+          />
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -284,7 +294,7 @@ export default async function ExpensesPage({
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <form
               method="get"
-              className="grid w-full gap-3 md:grid-cols-5"
+              className="grid w-full gap-3 md:grid-cols-4"
             >
               <input
                 name="q"
@@ -304,17 +314,9 @@ export default async function ExpensesPage({
                   </option>
                 ))}
               </select>
-              <input
-                name="date_from"
-                type="date"
-                defaultValue={filters.date_from}
-                className={inputClass}
-              />
-              <input
-                name="date_to"
-                type="date"
-                defaultValue={filters.date_to}
-                className={inputClass}
+              <DateRangeFields
+                from={filters.date_from}
+                to={filters.date_to}
               />
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-zinc-700">
@@ -331,14 +333,6 @@ export default async function ExpensesPage({
                 </button>
               </div>
             </form>
-          </div>
-
-          <div className="mb-4 flex justify-end">
-            <ExpenseFormModal
-              categories={activeCategories}
-              label="Tambah Pengeluaran"
-              className={primaryButtonClass}
-            />
           </div>
 
           <div className="overflow-x-auto">
@@ -373,11 +367,9 @@ export default async function ExpensesPage({
                       {formatRupiah(expense.amount)}
                     </td>
                     <td className={tdClass}>
-                      {expense.is_void ? (
-                        <span className="text-red-600">Void</span>
-                      ) : (
-                        <span className="text-green-700">Aktif</span>
-                      )}
+                      <StatusBadge
+                        status={expense.is_void ? "Void" : "Aktif"}
+                      />
                     </td>
                     <td className={tdClass}>
                       {expense.can_manage ? (
@@ -397,7 +389,11 @@ export default async function ExpensesPage({
                 {expenseViews.length === 0 ? (
                   <tr>
                     <td className={tdClass} colSpan={6}>
-                      Tidak ada pengeluaran pada filter ini.
+                      <EmptyState
+                        compact
+                        title="Tidak ada pengeluaran"
+                        description="Tidak ada pengeluaran pada filter ini."
+                      />
                     </td>
                   </tr>
                 ) : null}
@@ -447,7 +443,11 @@ export default async function ExpensesPage({
                 {breakdown.length === 0 ? (
                   <tr>
                     <td className={tdClass} colSpan={4}>
-                      Belum ada pengeluaran aktif pada periode ini.
+                      <EmptyState
+                        compact
+                        title="Belum ada pengeluaran aktif"
+                        description="Belum ada pengeluaran aktif pada periode ini."
+                      />
                     </td>
                   </tr>
                 ) : null}

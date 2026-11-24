@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import {
   PageHeading,
   Panel,
+  StatusBadge,
   secondaryButtonClass,
 } from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
@@ -92,17 +93,16 @@ export default async function SupplierReturnDetailPage({
       <PageHeading
         title={`Retur Supplier ${detail.return_number}`}
         description={`Dari pembelian ${detail.purchase_number} · ${detail.supplier_name}.`}
+        actions={
+          <Link href="/supplier-returns" className={secondaryButtonClass}>
+            Kembali ke Daftar Retur Supplier
+          </Link>
+        }
       />
-
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/supplier-returns" className={secondaryButtonClass}>
-          Kembali ke Daftar Retur Supplier
-        </Link>
-      </div>
 
       <div className="grid gap-4 lg:grid-cols-4">
         <Panel title="Penyelesaian">
-          <p className="text-lg font-semibold text-zinc-900">{detail.resolution_type}</p>
+          <StatusBadge status={detail.resolution_type} />
         </Panel>
         <Panel title="Nominal Final">
           <p className="text-lg font-semibold text-zinc-900">

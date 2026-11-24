@@ -2,8 +2,10 @@ import { ReturnClaimStatus, ReturnFundStatus } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  EmptyState,
   PageHeading,
   Panel,
+  StatusBadge,
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/ui";
@@ -131,23 +133,24 @@ export default async function CustomerReturnDetailPage({
       <PageHeading
         title={`Retur ${detail.return_number}`}
         description={`Dibatalkan dari ${detail.original_sale_number ?? "transaksi tanpa referensi"} pada ${new Date(detail.return_date).toLocaleString("id-ID")}.`}
+        actions={
+          <>
+            <Link href="/customer-returns" className={secondaryButtonClass}>
+              Kembali ke Daftar Retur
+            </Link>
+            <Link href="/customer-returns/new" className={primaryButtonClass}>
+              Catat Retur Baru
+            </Link>
+          </>
+        }
       />
-
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/customer-returns" className={secondaryButtonClass}>
-          Kembali ke Daftar Retur
-        </Link>
-        <Link href="/customer-returns/new" className={primaryButtonClass}>
-          Catat Retur Baru
-        </Link>
-      </div>
 
       <div className="grid gap-4 lg:grid-cols-4">
         <Panel title="Status Klaim">
-          <p className="text-lg font-semibold text-zinc-900">{detail.claim_status}</p>
+          <StatusBadge status={detail.claim_status} />
         </Panel>
         <Panel title="Status Dana">
-          <p className="text-lg font-semibold text-zinc-900">{detail.fund_status}</p>
+          <StatusBadge status={detail.fund_status} />
           {row.refund_paid_date ? (
             <p className="text-xs text-zinc-500">
               Dibayar {new Date(row.refund_paid_date).toLocaleDateString("id-ID")}
@@ -208,7 +211,7 @@ export default async function CustomerReturnDetailPage({
       <div className="mt-6">
         <Panel title="Riwayat Status">
           {histories.length === 0 ? (
-            <p className="text-sm text-zinc-500">Belum ada riwayat status.</p>
+            <EmptyState compact title="Belum ada riwayat status" />
           ) : (
             <ul className="space-y-3">
               {histories.map((history) => (

@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { PageHeading, Panel, secondaryButtonClass } from "@/components/ui";
+import {
+  EmptyState,
+  PageHeading,
+  Panel,
+  secondaryButtonClass,
+} from "@/components/ui";
 import { prisma } from "@/lib/prisma";
 import { NewCustomerReturnForm } from "./new-customer-return-form";
 import type { CustomerReturnSaleView, CustomerReturnVariantView } from "../types";
@@ -116,17 +121,19 @@ export default async function NewCustomerReturnPage() {
       <PageHeading
         title="Retur Pelanggan Baru"
         description="Barang layak jual kembali ke batch asal secara LIFO, sedangkan barang rusak masuk stok rusak."
+        actions={
+          <Link href="/customer-returns" className={secondaryButtonClass}>
+            Kembali ke Daftar Retur
+          </Link>
+        }
       />
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/customer-returns" className={secondaryButtonClass}>
-          Kembali ke Daftar Retur
-        </Link>
-      </div>
       <Panel title="Formulir Retur">
         {saleViews.length === 0 && variantViews.length === 0 ? (
-          <p className="rounded-md border border-dashed border-zinc-300 p-4 text-sm text-zinc-500">
-            Belum ada transaksi atau varian barang yang dapat diretur.
-          </p>
+          <EmptyState
+            compact
+            title="Belum ada data yang dapat diretur"
+            description="Belum ada transaksi atau varian barang yang dapat diretur."
+          />
         ) : (
           <NewCustomerReturnForm sales={saleViews} variants={variantViews} />
         )}

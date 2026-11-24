@@ -1,6 +1,16 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { PageHeading, Panel, inputClass, primaryButtonClass, secondaryButtonClass } from "@/components/ui";
+import {
+  DateRangeFields,
+  EmptyState,
+  PageHeading,
+  Panel,
+  StatusBadge,
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "@/components/ui";
+import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { PurchaseTabs } from "./purchase-tabs";
@@ -30,6 +40,8 @@ export default async function PurchasesPage({
   const statusRaw = firstValue(query.status);
   const supplierRaw = firstValue(query.supplier_id);
   const paymentRaw = firstValue(query.payment_status);
+  const dateFrom = firstValue(query.date_from);
+  const dateTo = firstValue(query.date_to);
 
   const status = PURCHASE_STATUSES.includes(statusRaw as (typeof PURCHASE_STATUSES)[number])
     ? statusRaw
@@ -46,6 +58,8 @@ export default async function PurchasesPage({
   if (paymentStatus) {
     where.payment_status = paymentStatus as (typeof PAYMENT_STATUSES)[number];
   }
+  const dateBounds = buildDateBounds(dateFrom, dateTo);
+  if (dateBounds) where.purchase_date = dateBounds;
 
   const [rows, suppliers] = await Promise.all([
     prisma.purchases.findMany({
@@ -84,20 +98,21 @@ export default async function PurchasesPage({
       <PageHeading
         title="Pembelian"
         description="Kelola pesanan pembelian produk, penerimaan barang, dan pembayaran supplier."
+        actions={
+          <>
+            <Link href="/purchases/new" className={primaryButtonClass}>
+              Buat Pesanan Pembelian
+            </Link>
+            <Link href="/purchases/packaging" className={secondaryButtonClass}>
+              Catat Pembelian Kemasan
+            </Link>
+          </>
+        }
       />
       <PurchaseTabs active="orders" />
 
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/purchases/new" className={primaryButtonClass}>
-          Buat Pesanan Pembelian
-        </Link>
-        <Link href="/purchases/packaging" className={secondaryButtonClass}>
-          Catat Pembelian Kemasan
-        </Link>
-      </div>
-
-      <Panel title="Filter Pesanan" description="Sesuaikan daftar berdasarkan status, supplier, atau status pembayaran.">
-        <form method="get" className="grid gap-3 md:grid-cols-4">
+      <Panel title="Filter Pesanan" description="Sesuaikan daftar berdasarkan status, supplier, status pembayaran, atau tanggal.">
+        <form method="get" className="grid gap-3 md:grid-cols-5">
           <div>
             <label htmlFor="status" className="text-sm font-medium">
               Status pesanan
@@ -147,6 +162,7 @@ export default async function PurchasesPage({
               ))}
             </select>
           </div>
+          <DateRangeFields from={dateFrom} to={dateTo} />
           <div className="flex items-end">
             <button type="submit" className={secondaryButtonClass}>
               Terapkan Filter
@@ -172,8 +188,12 @@ export default async function PurchasesPage({
           <tbody className="divide-y divide-zinc-100">
             {purchaseViews.length === 0 ? (
               <tr>
-                <td className={`${tdClass} text-center text-zinc-500`} colSpan={8}>
-                  Belum ada pesanan pembelian yang cocok dengan filter.
+                <td className={tdClass} colSpan={8}>
+                  <EmptyState
+                    compact
+                    title="Belum ada pesanan pembelian"
+                    description="Belum ada pesanan pembelian yang cocok dengan filter."
+                  />
                 </td>
               </tr>
             ) : (
@@ -187,9 +207,15 @@ export default async function PurchasesPage({
                     {new Date(purchase.purchase_date).toLocaleDateString("id-ID")}
                   </td>
                   <td className={tdClass}>{formatRupiah(purchase.total_amount)}</td>
-                  <td className={tdClass}>{purchaseStatusLabel(purchase.status)}</td>
                   <td className={tdClass}>
-                    {paymentStatusLabel(purchase.payment_status)}
+                    <StatusBadge status={purchase.status}>
+                      {purchaseStatusLabel(purchase.status)}
+                    </StatusBadge>
+                  </td>
+                  <td className={tdClass}>
+                    <StatusBadge status={purchase.payment_status}>
+                      {paymentStatusLabel(purchase.payment_status)}
+                    </StatusBadge>
                   </td>
                   <td className={tdClass}>{purchase.item_count}</td>
                   <td className={tdClass}>

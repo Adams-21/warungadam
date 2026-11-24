@@ -1,8 +1,11 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import {
+  DateRangeFields,
+  EmptyState,
   PageHeading,
   Panel,
+  StatusBadge,
   inputClass,
   primaryButtonClass,
   secondaryButtonClass,
@@ -148,13 +151,12 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       <PageHeading
         title="Penjualan"
         description="Catat transaksi offline dan marketplace, pantau stok yang terpotong, serta lihat HPP dan laba kotor."
+        actions={
+          <Link href="/sales/new" className={primaryButtonClass}>
+            Catat Penjualan
+          </Link>
+        }
       />
-
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/sales/new" className={primaryButtonClass}>
-          Catat Penjualan
-        </Link>
-      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Panel title="Jumlah Transaksi">
@@ -237,27 +239,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
                 ))}
               </select>
             </div>
-            <div>
-              <label htmlFor="date_from" className="text-sm font-medium">
-                Dari tanggal
-              </label>
-              <input
-                id="date_from"
-                name="date_from"
-                type="date"
-                defaultValue={dateFrom}
-                className={inputClass}
-              />
-            </div>
-            <div className="flex items-end gap-2">
-              <input
-                id="date_to"
-                name="date_to"
-                type="date"
-                defaultValue={dateTo}
-                aria-label="Sampai tanggal"
-                className={inputClass}
-              />
+            <DateRangeFields from={dateFrom} to={dateTo} />
+            <div className="flex items-end">
               <button type="submit" className={secondaryButtonClass}>
                 Filter
               </button>
@@ -284,11 +267,12 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           <tbody className="divide-y divide-zinc-100">
             {saleViews.length === 0 ? (
               <tr>
-                <td
-                  className={`${tdClass} text-center text-zinc-500`}
-                  colSpan={9}
-                >
-                  Belum ada transaksi yang cocok dengan filter.
+                <td className={tdClass} colSpan={9}>
+                  <EmptyState
+                    compact
+                    title="Belum ada transaksi"
+                    description="Belum ada transaksi yang cocok dengan filter."
+                  />
                 </td>
               </tr>
             ) : (
@@ -322,13 +306,17 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
                   </td>
                   <td className={tdClass}>{formatRupiah(sale.gross_profit)}</td>
                   <td className={tdClass}>
-                    <span className="block">{saleOrderStatusLabel(sale.order_status)}</span>
-                    <span className="block text-xs text-zinc-500">
-                      {salePaymentStatusLabel(sale.payment_status)}
-                    </span>
-                    <span className="block text-xs text-zinc-500">
-                      {saleSettlementStatusLabel(sale.settlement_status)}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      <StatusBadge status={sale.order_status}>
+                        {saleOrderStatusLabel(sale.order_status)}
+                      </StatusBadge>
+                      <StatusBadge status={sale.payment_status}>
+                        {salePaymentStatusLabel(sale.payment_status)}
+                      </StatusBadge>
+                      <StatusBadge status={sale.settlement_status}>
+                        {saleSettlementStatusLabel(sale.settlement_status)}
+                      </StatusBadge>
+                    </div>
                   </td>
                   <td className={tdClass}>
                     <Link

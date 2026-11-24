@@ -1,4 +1,12 @@
-import { PageHeading, Panel, inputClass, primaryButtonClass } from "@/components/ui";
+import {
+  DateRangeFields,
+  EmptyState,
+  PageHeading,
+  Panel,
+  StatusBadge,
+  inputClass,
+  primaryButtonClass,
+} from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { StockAdjustmentModal } from "./inventory-manager";
@@ -289,6 +297,7 @@ export default async function InventoryPage({
       <PageHeading
         title="Stok & Penyesuaian"
         description="Pantau batch FIFO produk, stok kemasan, riwayat mutasi, dan lakukan penyesuaian stok."
+        actions={<StockAdjustmentModal variants={adjustmentOptions} />}
       />
       <InventoryTabs active={tab} />
 
@@ -314,9 +323,6 @@ export default async function InventoryPage({
             title="Stok Produk & Batch FIFO"
             description="Batch aktif diurutkan dari yang paling lama diterima."
           >
-            <div className="mb-4 flex justify-end">
-              <StockAdjustmentModal variants={adjustmentOptions} />
-            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-zinc-200">
                 <thead>
@@ -333,9 +339,11 @@ export default async function InventoryPage({
                       <td className={`${tdClass} font-medium`}>
                         {variant.product_name} — {variant.variant_name}
                         {variant.is_low ? (
-                          <p className="text-xs text-amber-600">
-                            Stok menipis (min. {formatNumber(variant.min_stock ?? 0)})
-                          </p>
+                          <div className="mt-1">
+                            <StatusBadge status="Menipis" tone="warning">
+                              Stok menipis (min. {formatNumber(variant.min_stock ?? 0)})
+                            </StatusBadge>
+                          </div>
                         ) : null}
                       </td>
                       <td className={tdClass}>
@@ -364,8 +372,11 @@ export default async function InventoryPage({
                   ))}
                   {productViews.length === 0 ? (
                     <tr>
-                      <td className={`${tdClass} text-center`} colSpan={4}>
-                        Belum ada varian produk.
+                      <td className={tdClass} colSpan={4}>
+                        <EmptyState
+                          compact
+                          title="Belum ada varian produk"
+                        />
                       </td>
                     </tr>
                   ) : null}
@@ -398,9 +409,11 @@ export default async function InventoryPage({
                       <td className={`${tdClass} font-medium`}>
                         {material.name}
                         {material.is_low ? (
-                          <p className="text-xs text-amber-600">
-                            Stok menipis (min. {formatNumber(material.min_stock ?? 0)})
-                          </p>
+                          <div className="mt-1">
+                            <StatusBadge status="Menipis" tone="warning">
+                              Stok menipis (min. {formatNumber(material.min_stock ?? 0)})
+                            </StatusBadge>
+                          </div>
                         ) : null}
                       </td>
                       <td className={tdClass}>
@@ -416,8 +429,8 @@ export default async function InventoryPage({
                   ))}
                   {packagingViews.length === 0 ? (
                     <tr>
-                      <td className={`${tdClass} text-center`} colSpan={4}>
-                        Belum ada kemasan.
+                      <td className={tdClass} colSpan={4}>
+                        <EmptyState compact title="Belum ada kemasan" />
                       </td>
                     </tr>
                   ) : null}
@@ -460,17 +473,9 @@ export default async function InventoryPage({
                 <option value="OUT">OUT</option>
                 <option value="ADJUSTMENT">ADJUSTMENT</option>
               </select>
-              <input
-                name="date_from"
-                type="date"
-                defaultValue={toInputDate(fromDate)}
-                className={inputClass}
-              />
-              <input
-                name="date_to"
-                type="date"
-                defaultValue={toInputDate(toDate)}
-                className={inputClass}
+              <DateRangeFields
+                from={toInputDate(fromDate)}
+                to={toInputDate(toDate)}
               />
               <div className="flex items-end md:col-span-5">
                 <button type="submit" className={primaryButtonClass}>
@@ -517,8 +522,12 @@ export default async function InventoryPage({
                   ))}
                   {mutationViews.length === 0 ? (
                     <tr>
-                      <td className={`${tdClass} text-center`} colSpan={7}>
-                        Tidak ada mutasi pada filter ini.
+                      <td className={tdClass} colSpan={7}>
+                        <EmptyState
+                          compact
+                          title="Tidak ada mutasi"
+                          description="Tidak ada mutasi pada filter ini."
+                        />
                       </td>
                     </tr>
                   ) : null}

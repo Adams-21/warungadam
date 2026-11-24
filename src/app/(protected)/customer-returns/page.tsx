@@ -4,11 +4,15 @@ import {
 } from "@prisma/client";
 import Link from "next/link";
 import {
+  DateRangeFields,
+  EmptyState,
   PageHeading,
   Panel,
+  StatusBadge,
   inputClass,
   primaryButtonClass,
 } from "@/components/ui";
+import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { CustomerReturnListItemView } from "./types";
@@ -23,6 +27,8 @@ type SearchParams = Promise<{
   q?: string;
   claim_status?: string;
   fund_status?: string;
+  date_from?: string;
+  date_to?: string;
 }>;
 
 export default async function CustomerReturnsPage({
@@ -32,6 +38,8 @@ export default async function CustomerReturnsPage({
 }) {
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
+  const dateFrom = params.date_from ?? "";
+  const dateTo = params.date_to ?? "";
   const claimStatus = Object.values(ReturnClaimStatus).includes(
     params.claim_status as ReturnClaimStatus,
   )
@@ -47,10 +55,13 @@ export default async function CustomerReturnsPage({
     return_number?: { contains: string; mode: "insensitive" };
     claim_status?: ReturnClaimStatus;
     fund_status?: ReturnFundStatus;
+    return_date?: { gte?: Date; lte?: Date };
   } = {};
   if (query) where.return_number = { contains: query, mode: "insensitive" };
   if (claimStatus) where.claim_status = claimStatus;
   if (fundStatus) where.fund_status = fundStatus;
+  const dateBounds = buildDateBounds(dateFrom, dateTo);
+  if (dateBounds) where.return_date = dateBounds;
 
   const returns = await prisma.customerReturns.findMany({
     where,
@@ -88,13 +99,12 @@ export default async function CustomerReturnsPage({
       <PageHeading
         title="Retur Pelanggan"
         description="Kelola barang kembali dari pelanggan, pemulihan stok, dan pengembalian dana."
+        actions={
+          <Link href="/customer-returns/new" className={primaryButtonClass}>
+            Catat Retur Baru
+          </Link>
+        }
       />
-
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/customer-returns/new" className={primaryButtonClass}>
-          Catat Retur Baru
-        </Link>
-      </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Panel title="Jumlah Retur">
@@ -108,7 +118,7 @@ export default async function CustomerReturnsPage({
       </div>
 
       <Panel title="Daftar Retur" description="Maksimal 200 retur terbaru ditampilkan.">
-        <form method="get" className="mb-5 grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto]">
+        <form method="get" className="mb-5 grid gap-3 md:grid-cols-[2fr_1fr_1fr_2fr_auto]">
           <div>
             <label htmlFor="q" className="text-sm font-medium">
               Nomor Retur
@@ -157,15 +167,18 @@ export default async function CustomerReturnsPage({
               ))}
             </select>
           </div>
+          <DateRangeFields from={dateFrom} to={dateTo} />
           <button type="submit" className="self-end rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
             Filter
           </button>
         </form>
 
         {views.length === 0 ? (
-          <p className="rounded-md border border-dashed border-zinc-300 p-4 text-sm text-zinc-500">
-            Belum ada retur yang cocok dengan filter.
-          </p>
+          <EmptyState
+            compact
+            title="Belum ada retur"
+            description="Belum ada retur yang cocok dengan filter."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-zinc-200">
@@ -192,10 +205,12 @@ export default async function CustomerReturnsPage({
                     </td>
                     <td className={tdClass}>{row.original_sale_number ?? "Tanpa referensi"}</td>
                     <td className={tdClass}>{row.total_items}</td>
-                    <td className={tdClass}>{row.claim_status}</td>
                     <td className={tdClass}>
-                      <p>{row.fund_status}</p>
-                      <p className="text-xs text-zinc-500">
+                      <StatusBadge status={row.claim_status} />
+                    </td>
+                    <td className={tdClass}>
+                      <StatusBadge status={row.fund_status} />
+                      <p className="mt-1 text-xs text-zinc-500">
                         {formatRupiah(row.refund_amount)}
                       </p>
                     </td>

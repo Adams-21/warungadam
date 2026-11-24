@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PageHeading, Panel, primaryButtonClass } from "@/components/ui";
+import {
+  EmptyState,
+  PageHeading,
+  Panel,
+  StatusBadge,
+  primaryButtonClass,
+} from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { uuidSchema } from "@/lib/schemas";
@@ -169,14 +175,15 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
       <PageHeading
         title={`Transaksi ${detail.transaction_number}`}
         description="Rincian item, alokasi batch FIFO, pemakaian kemasan, dan perhitungan HPP."
+        actions={
+          <>
+            <Link href="/sales" className={primaryButtonClass}>
+              Kembali ke Daftar
+            </Link>
+            <PrintSaleButton />
+          </>
+        }
       />
-
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/sales" className={primaryButtonClass}>
-          Kembali ke Daftar
-        </Link>
-        <PrintSaleButton />
-      </div>
 
       <Panel
         title={settings?.business_name ?? "BizManage"}
@@ -231,18 +238,27 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
             <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Status
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
-              {saleOrderStatusLabel(detail.order_status)} ·{" "}
-              {salePaymentStatusLabel(detail.payment_status)} ·{" "}
-              {saleSettlementStatusLabel(detail.settlement_status)}
+            <dd className="mt-1 flex flex-wrap gap-2">
+              <StatusBadge status={detail.order_status}>
+                {saleOrderStatusLabel(detail.order_status)}
+              </StatusBadge>
+              <StatusBadge status={detail.payment_status}>
+                {salePaymentStatusLabel(detail.payment_status)}
+              </StatusBadge>
+              <StatusBadge status={detail.settlement_status}>
+                {saleSettlementStatusLabel(detail.settlement_status)}
+              </StatusBadge>
             </dd>
           </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Stok Produk
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
-              {detail.is_stock_deducted ? "Sudah dipotong" : "Belum dipotong"}
+            <dd className="mt-1">
+              <StatusBadge
+                status={detail.is_stock_deducted ? "Sudah dipotong" : "Belum dipotong"}
+                tone={detail.is_stock_deducted ? "success" : "warning"}
+              />
             </dd>
           </div>
         </dl>
@@ -332,9 +348,11 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Panel title="Rincian Kemasan">
           {detail.packaging_usages.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              Transaksi ini tidak memakai material kemasan.
-            </p>
+            <EmptyState
+              compact
+              title="Tidak memakai material kemasan"
+              description="Transaksi ini tidak memakai material kemasan."
+            />
           ) : (
             <table className="min-w-full divide-y divide-zinc-200">
               <thead>
@@ -377,7 +395,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
         <Panel title="Riwayat Status">
           {detail.status_histories.length === 0 ? (
-            <p className="text-sm text-zinc-500">Belum ada riwayat status.</p>
+            <EmptyState compact title="Belum ada riwayat status" />
           ) : (
             <div className="space-y-3">
               {detail.status_histories.map((history) => (

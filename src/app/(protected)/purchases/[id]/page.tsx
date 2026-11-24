@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PageHeading, Panel, primaryButtonClass } from "@/components/ui";
+import {
+  EmptyState,
+  PageHeading,
+  Panel,
+  StatusBadge,
+  primaryButtonClass,
+} from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { uuidSchema } from "@/lib/schemas";
@@ -139,14 +145,13 @@ export default async function PurchaseDetailPage({
       <PageHeading
         title={`Pesanan ${purchase.purchase_number}`}
         description="Pantau penerimaan barang, batch FIFO, dan pembayaran supplier."
+        actions={
+          <Link href="/purchases" className={primaryButtonClass}>
+            Kembali ke Daftar
+          </Link>
+        }
       />
       <PurchaseTabs active="orders" />
-
-      <div className="mb-6">
-        <Link href="/purchases" className={primaryButtonClass}>
-          Kembali ke Daftar
-        </Link>
-      </div>
 
       <Panel title="Ringkasan Pesanan">
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -179,9 +184,13 @@ export default async function PurchaseDetailPage({
             <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Status
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
-              {purchaseStatusLabel(detail.status)} ·{" "}
-              {paymentStatusLabel(detail.payment_status)}
+            <dd className="mt-1 flex flex-wrap gap-2">
+              <StatusBadge status={detail.status}>
+                {purchaseStatusLabel(detail.status)}
+              </StatusBadge>
+              <StatusBadge status={detail.payment_status}>
+                {paymentStatusLabel(detail.payment_status)}
+              </StatusBadge>
             </dd>
           </div>
           <div>
@@ -284,7 +293,7 @@ export default async function PurchaseDetailPage({
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Panel title="Riwayat Penerimaan">
           {goodsReceiptViews.length === 0 ? (
-            <p className="text-sm text-zinc-500">Belum ada penerimaan.</p>
+            <EmptyState compact title="Belum ada penerimaan" />
           ) : (
             <div className="space-y-4">
               {goodsReceiptViews.map((receipt) => (
@@ -317,7 +326,7 @@ export default async function PurchaseDetailPage({
 
         <Panel title="Riwayat Pembayaran">
           {supplierPaymentViews.length === 0 ? (
-            <p className="text-sm text-zinc-500">Belum ada pembayaran.</p>
+            <EmptyState compact title="Belum ada pembayaran" />
           ) : (
             <div className="space-y-3">
               {supplierPaymentViews.map((payment) => (

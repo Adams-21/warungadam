@@ -1,11 +1,15 @@
 import { SupplierReturnResolution } from "@prisma/client";
 import Link from "next/link";
 import {
+  DateRangeFields,
+  EmptyState,
   PageHeading,
   Panel,
+  StatusBadge,
   inputClass,
   primaryButtonClass,
 } from "@/components/ui";
+import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { SupplierReturnListItemView } from "./types";
@@ -19,6 +23,8 @@ const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 type SearchParams = Promise<{
   q?: string;
   resolution_type?: string;
+  date_from?: string;
+  date_to?: string;
 }>;
 
 export default async function SupplierReturnsPage({
@@ -28,6 +34,8 @@ export default async function SupplierReturnsPage({
 }) {
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
+  const dateFrom = params.date_from ?? "";
+  const dateTo = params.date_to ?? "";
   const resolution = Object.values(SupplierReturnResolution).includes(
     params.resolution_type as SupplierReturnResolution,
   )
@@ -37,9 +45,12 @@ export default async function SupplierReturnsPage({
   const where: {
     return_number?: { contains: string; mode: "insensitive" };
     resolution_type?: SupplierReturnResolution;
+    return_date?: { gte?: Date; lte?: Date };
   } = {};
   if (query) where.return_number = { contains: query, mode: "insensitive" };
   if (resolution) where.resolution_type = resolution;
+  const dateBounds = buildDateBounds(dateFrom, dateTo);
+  if (dateBounds) where.return_date = dateBounds;
 
   const rows = await prisma.supplierReturns.findMany({
     where,
@@ -85,13 +96,12 @@ export default async function SupplierReturnsPage({
       <PageHeading
         title="Retur Supplier"
         description="Catat pengembalian barang ke supplier dan dampaknya pada stok serta tagihan."
+        actions={
+          <Link href="/supplier-returns/new" className={primaryButtonClass}>
+            Catat Retur Supplier
+          </Link>
+        }
       />
-
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Link href="/supplier-returns/new" className={primaryButtonClass}>
-          Catat Retur Supplier
-        </Link>
-      </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Panel title="Jumlah Retur">
@@ -105,7 +115,7 @@ export default async function SupplierReturnsPage({
       </div>
 
       <Panel title="Daftar Retur Supplier" description="Maksimal 200 retur terbaru ditampilkan.">
-        <form method="get" className="mb-5 grid gap-3 md:grid-cols-[2fr_1fr_auto]">
+        <form method="get" className="mb-5 grid gap-3 md:grid-cols-[2fr_1fr_2fr_auto]">
           <div>
             <label htmlFor="q" className="text-sm font-medium">
               Nomor Retur
@@ -136,15 +146,18 @@ export default async function SupplierReturnsPage({
               ))}
             </select>
           </div>
+          <DateRangeFields from={dateFrom} to={dateTo} />
           <button type="submit" className="self-end rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
             Filter
           </button>
         </form>
 
         {views.length === 0 ? (
-          <p className="rounded-md border border-dashed border-zinc-300 p-4 text-sm text-zinc-500">
-            Belum ada retur supplier yang cocok dengan filter.
-          </p>
+          <EmptyState
+            compact
+            title="Belum ada retur supplier"
+            description="Belum ada retur supplier yang cocok dengan filter."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-zinc-200">
@@ -172,7 +185,9 @@ export default async function SupplierReturnsPage({
                       <p>{row.purchase_number}</p>
                       <p className="text-xs text-zinc-500">{row.supplier_name}</p>
                     </td>
-                    <td className={tdClass}>{row.resolution_type}</td>
+                    <td className={tdClass}>
+                      <StatusBadge status={row.resolution_type} />
+                    </td>
                     <td className={tdClass}>
                       <p>{formatRupiah(row.return_amount)}</p>
                       <p className="text-xs text-zinc-500">

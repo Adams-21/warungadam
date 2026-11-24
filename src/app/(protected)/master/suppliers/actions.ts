@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { optionalTextSchema, uuidSchema } from "@/lib/schemas";
+import { getBlockingRelations } from "../master-data-rules";
 
 const supplierSchema = z.object({
   name: z.string().trim().min(1, "Nama supplier wajib diisi").max(150),
@@ -158,9 +159,9 @@ export async function deleteSupplierAction(formData: FormData): Promise<void> {
   });
   if (!supplier) return;
 
-  const isReferenced =
-    supplier._count.purchases > 0 || supplier._count.variant_suppliers > 0;
-  if (isReferenced) return;
+  const hasRelations =
+    getBlockingRelations("SUPPLIER", supplier._count).length > 0;
+  if (hasRelations) return;
 
   await prisma.$transaction(async (tx) => {
     await tx.suppliers.delete({ where: { id: parsedId.data } });

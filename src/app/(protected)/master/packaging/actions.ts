@@ -13,12 +13,19 @@ import {
   positiveDecimalSchema,
   uuidSchema,
 } from "@/lib/schemas";
+import {
+  getBlockingRelations,
+  isPositiveConversionFactor,
+} from "../master-data-rules";
 
 const materialSchema = z.object({
   name: z.string().trim().min(1, "Nama material wajib diisi").max(100),
   purchase_unit_id: uuidSchema,
   usage_unit_id: uuidSchema,
-  conversion_factor: positiveDecimalSchema,
+  conversion_factor: positiveDecimalSchema.refine(
+    (value) => isPositiveConversionFactor(value),
+    "Faktor konversi kemasan harus lebih dari 0",
+  ),
   min_stock: nullableDecimalSchema,
 });
 
@@ -204,7 +211,7 @@ export async function deletePackageSizeAction(
     return { error: "Ukuran paket tidak ditemukan." };
   }
 
-  if (salesCount > 0) {
+  if (getBlockingRelations("PACKAGE_SIZE", { sales: salesCount }).length > 0) {
     return {
       error:
         "Ukuran paket sudah dipakai transaksi dan hanya bisa dinonaktifkan.",

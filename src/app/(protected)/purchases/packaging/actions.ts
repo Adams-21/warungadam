@@ -15,6 +15,11 @@ import {
   uuidSchema,
 } from "@/lib/schemas";
 import { generateDocumentNumber } from "@/lib/sequence";
+import {
+  calculateItemSubtotal,
+  calculateWeightedAverageUnitCost,
+  convertPurchaseToUsageQty,
+} from "../purchase-rules";
 
 const packagingItemSchema = z.object({
   packaging_material_id: uuidSchema,
@@ -41,10 +46,6 @@ function parseDateInput(value: FormDataEntryValue | null): Date | null {
   if (typeof value !== "string" || value.trim() === "") return null;
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function roundToBigInt(value: Prisma.Decimal): bigint {
-  return BigInt(value.toDecimalPlaces(0).toFixed(0));
 }
 
 export async function createPackagingPurchaseAction(
@@ -101,19 +102,20 @@ export async function createPackagingPurchaseAction(
       }
 
       const purchaseQty = new Prisma.Decimal(item.purchase_qty.toString());
-      const conversionFactor = material.conversion_factor;
-      const usageQty = purchaseQty.mul(conversionFactor);
-      const unitPriceDecimal = new Prisma.Decimal(item.unit_price.toString());
-      const subtotal = roundToBigInt(purchaseQty.mul(unitPriceDecimal));
-
-      const nextStock = material.stock_qty.plus(usageQty);
-      const currentValue = material.stock_qty.mul(material.average_unit_cost);
-      const nextAverage = nextStock.isZero()
-        ? material.average_unit_cost
-        : currentValue
-            .plus(new Prisma.Decimal(subtotal.toString()))
-            .div(nextStock)
-            .toDecimalPlaces(4);
+      const usageQty = convertPurchaseToUsageQty(
+        purchaseQty,
+        material.conversion_factor,
+      );
+      const subtotal = calculateItemSubtotal({
+        ordered_qty: purchaseQty,
+        unit_price: item.unit_price,
+      });
+      const nextAverage = calculateWeightedAverageUnitCost({
+        currentStock: material.stock_qty,
+        currentAverageCost: material.average_unit_cost,
+        purchaseSubtotal: subtotal,
+        usageQty,
+      });
 
       return {
         materialId: material.id,

@@ -13,6 +13,10 @@ import {
   priceSchema,
   uuidSchema,
 } from "@/lib/schemas";
+import {
+  getBlockingRelations,
+  isPositivePrice,
+} from "../master-data-rules";
 
 const categorySchema = z.object({
   name: z.string().trim().min(1, "Nama kategori wajib diisi").max(100),
@@ -29,20 +33,29 @@ const variantSchema = z.object({
   unit_id: uuidSchema,
   name: z.string().trim().min(1, "Nama varian wajib diisi").max(150),
   barcode: optionalTextSchema,
-  default_selling_price: priceSchema,
+  default_selling_price: priceSchema.refine(
+    (value) => isPositivePrice(value),
+    "Harga jual harus lebih dari 0",
+  ),
   min_stock: nullableDecimalSchema,
 });
 
 const channelPriceSchema = z.object({
   variant_id: uuidSchema,
   sales_channel_id: uuidSchema,
-  selling_price: priceSchema,
+  selling_price: priceSchema.refine(
+    (value) => isPositivePrice(value),
+    "Harga jual harus lebih dari 0",
+  ),
 });
 
 const supplierPriceSchema = z.object({
   variant_id: uuidSchema,
   supplier_id: uuidSchema,
-  purchase_price: priceSchema,
+  purchase_price: priceSchema.refine(
+    (value) => isPositivePrice(value),
+    "Harga beli harus lebih dari 0",
+  ),
 });
 
 const MUTATION_ERROR = "Gagal menyimpan data produk.";
@@ -136,7 +149,7 @@ export async function deleteCategoryAction(
     where: { category_id: parsedId.data },
   });
 
-  if (productCount > 0) {
+  if (getBlockingRelations("CATEGORY", { products: productCount }).length > 0) {
     return {
       error: "Kategori masih digunakan produk dan tidak dapat dihapus.",
     };

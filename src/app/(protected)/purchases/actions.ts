@@ -16,6 +16,7 @@ import {
   priceSchema,
   uuidSchema,
 } from "@/lib/schemas";
+import { calculatePurchaseTotal, validatePurchaseLines } from "./purchase-rules";
 import { PAYMENT_TYPES } from "./types";
 
 const purchaseItemSchema = z.object({
@@ -39,10 +40,6 @@ function parseDateInput(value: FormDataEntryValue | null): Date | null {
   if (typeof value !== "string" || value.trim() === "") return null;
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function roundToBigInt(value: Prisma.Decimal): bigint {
-  return BigInt(value.toDecimalPlaces(0).toFixed(0));
 }
 
 export async function createPurchaseAction(
@@ -71,8 +68,9 @@ export async function createPurchaseAction(
   }
 
   const itemIds = parsed.data.items.map((item) => item.variant_id);
-  if (new Set(itemIds).size !== itemIds.length) {
-    return { error: "Varian tidak boleh duplikat dalam satu pesanan." };
+  const lineError = validatePurchaseLines(parsed.data.items);
+  if (lineError) {
+    return { error: lineError };
   }
 
   const user = await requireAuth();
@@ -97,17 +95,7 @@ export async function createPurchaseAction(
       throw new ActionError("Sebagian varian tidak ditemukan atau tidak aktif.");
     }
 
-    const subtotals = parsed.data.items.map((item) =>
-      roundToBigInt(
-        new Prisma.Decimal(item.unit_price.toString()).mul(
-          item.ordered_qty.toString(),
-        ),
-      ),
-    );
-    const totalAmount = subtotals.reduce(
-      (sum, value) => sum + value,
-      BigInt(0),
-    );
+    const totalAmount = calculatePurchaseTotal(parsed.data.items);
     const dueDate =
       parsed.data.payment_type === "TEMPO" ? parsed.data.due_date : null;
 

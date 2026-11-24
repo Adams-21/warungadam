@@ -10,6 +10,12 @@ import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateDocumentNumber } from "@/lib/sequence";
 import { optionalTextSchema, priceSchema, uuidSchema } from "@/lib/schemas";
+import {
+  resolvePurchaseStatus,
+  resolveSupplierPayment,
+  validateReceivedQty,
+  validateSupplierPayment,
+} from "../purchase-rules";
 
 const receiveItemSchema = z.object({
   purchase_item_id: uuidSchema,
@@ -130,13 +136,13 @@ export async function receiveGoodsAction(
         }
 
         const qty = new Prisma.Decimal(row.received_qty.toString());
-        const remaining = purchaseItem.ordered_qty.minus(
+        const receiptError = validateReceivedQty(
+          purchaseItem.ordered_qty,
           purchaseItem.received_qty,
+          qty,
         );
-        if (qty.gt(remaining)) {
-          throw new ActionError(
-            "Jumlah diterima melebihi sisa pesanan pada salah satu item.",
-          );
+        if (receiptError) {
+          throw new ActionError(receiptError);
         }
 
         const receiptItem = await tx.goodsReceiptItems.create({
@@ -194,13 +200,11 @@ export async function receiveGoodsAction(
         where: { purchase_id: parsed.data.purchase_id },
         select: { ordered_qty: true, received_qty: true },
       });
-      const isComplete = allItems.every((item) =>
-        item.received_qty.gte(item.ordered_qty),
-      );
+      const status = resolvePurchaseStatus(allItems);
 
       await tx.purchases.update({
         where: { id: parsed.data.purchase_id },
-        data: { status: isComplete ? "Diterima_seluruhnya" : "Diterima_sebagian" },
+        data: { status },
       });
 
       await logActivity(
@@ -261,18 +265,15 @@ export async function recordSupplierPaymentAction(
       if (purchase.status === "Dibatalkan") {
         throw new ActionError("Pesanan dibatalkan tidak dapat dibayar.");
       }
-      if (purchase.remaining_amount <= BigInt(0)) {
-        throw new ActionError("Tagihan pesanan ini sudah lunas.");
-      }
-      if (parsed.data.amount > purchase.remaining_amount) {
-        throw new ActionError("Nominal pembayaran melebihi sisa tagihan.");
-      }
 
-      const nextPaidAmount = purchase.paid_amount + parsed.data.amount;
-      const nextRemainingAmount =
-        purchase.remaining_amount - parsed.data.amount;
-      const nextPaymentStatus =
-        nextRemainingAmount === BigInt(0) ? "Lunas" : "Sebagian";
+      const paymentError = validateSupplierPayment(
+        purchase,
+        parsed.data.amount,
+      );
+      if (paymentError) {
+        throw new ActionError(paymentError);
+      }
+      const nextPayment = resolveSupplierPayment(purchase, parsed.data.amount);
 
       const created = await tx.supplierPayments.create({
         data: {
@@ -288,9 +289,9 @@ export async function recordSupplierPaymentAction(
       await tx.purchases.update({
         where: { id: parsed.data.purchase_id },
         data: {
-          paid_amount: nextPaidAmount,
-          remaining_amount: nextRemainingAmount,
-          payment_status: nextPaymentStatus,
+          paid_amount: nextPayment.paid_amount,
+          remaining_amount: nextPayment.remaining_amount,
+          payment_status: nextPayment.payment_status,
         },
       });
 

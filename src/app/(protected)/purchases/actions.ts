@@ -8,6 +8,7 @@ import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { parseStrictDateInput } from "@/lib/date-range";
 import { getErrorMessage } from "@/lib/error-handler";
 import { generateDocumentNumber } from "@/lib/sequence";
 import { prisma } from "@/lib/prisma";
@@ -17,7 +18,11 @@ import {
   priceSchema,
   uuidSchema,
 } from "@/lib/schemas";
-import { calculatePurchaseTotal, validatePurchaseLines } from "./purchase-rules";
+import {
+  calculatePurchaseTotal,
+  validatePurchaseDueDate,
+  validatePurchaseLines,
+} from "./purchase-rules";
 import { PAYMENT_TYPES } from "./types";
 
 const purchaseItemSchema = z.object({
@@ -26,21 +31,26 @@ const purchaseItemSchema = z.object({
   unit_price: priceSchema,
 });
 
-const createPurchaseSchema = z.object({
-  supplier_id: uuidSchema,
-  purchase_date: z.date(),
-  payment_type: z.enum(PAYMENT_TYPES),
-  due_date: z.date().nullable(),
-  notes: optionalTextSchema,
-  items: z.array(purchaseItemSchema).min(1, "Minimal satu item wajib diisi"),
-});
+const createPurchaseSchema = z
+  .object({
+    supplier_id: uuidSchema,
+    purchase_date: z.date(),
+    payment_type: z.enum(PAYMENT_TYPES),
+    due_date: z.date().nullable(),
+    notes: optionalTextSchema,
+    items: z.array(purchaseItemSchema).min(1, "Minimal satu item wajib diisi"),
+  })
+  .superRefine((value, ctx) => {
+    const error = validatePurchaseDueDate(value.payment_type, value.due_date);
+    if (error) {
+      ctx.addIssue({ code: "custom", message: error, path: ["due_date"] });
+    }
+  });
 
 const REVALIDATE_PATHS = ["/purchases", "/dashboard"];
 
-function parseDateInput(value: FormDataEntryValue | null): Date | null {
-  if (typeof value !== "string" || value.trim() === "") return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+function parseFormDate(value: FormDataEntryValue | null): Date | null {
+  return typeof value === "string" ? parseStrictDateInput(value) : null;
 }
 
 export async function createPurchaseAction(
@@ -56,9 +66,9 @@ export async function createPurchaseAction(
 
     const parsed = createPurchaseSchema.safeParse({
       supplier_id: formData.get("supplier_id"),
-      purchase_date: parseDateInput(formData.get("purchase_date")),
+      purchase_date: parseFormDate(formData.get("purchase_date")),
       payment_type: formData.get("payment_type"),
-      due_date: parseDateInput(formData.get("due_date")),
+      due_date: parseFormDate(formData.get("due_date")),
       notes: formData.get("notes"),
       items: variantIds.map((variantId, index) => ({
         variant_id: variantId,

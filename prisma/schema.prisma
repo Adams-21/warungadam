@@ -281,10 +281,11 @@ model ProductVariants {
 }
 
 model SalesChannels {
-  id             String  @id @default(uuid()) @db.Uuid
-  name           String  @unique
-  is_marketplace Boolean @default(false)
-  is_active      Boolean @default(true)
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String   @unique
+  is_marketplace Boolean  @default(false)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now()) @db.Timestamptz
 
   variant_channel_prices VariantChannelPrices[]
   sales                  Sales[]
@@ -536,7 +537,7 @@ model StockMovements {
 model Sales {
   id                        String               @id @default(uuid()) @db.Uuid
   transaction_number        String               @unique
-  sales_channel_id          String               @db.Uuid
+  sales_channel_id          String?              @db.Uuid
   package_size_id           String?              @db.Uuid
   external_order_number     String?
   transaction_date          DateTime             @db.Timestamptz
@@ -549,12 +550,13 @@ model Sales {
   admin_fee_actual_amount   BigInt?
   order_status              SaleOrderStatus      @default(Baru)
   payment_status            SalePaymentStatus    @default(Belum_dibayar)
+  payment_method            String?
   settlement_status         SaleSettlementStatus @default(Belum_cair)
   is_stock_deducted         Boolean              @default(false)
   created_by_id             String               @db.Uuid
   created_at                DateTime             @default(now()) @db.Timestamptz
 
-  sales_channel SalesChannels @relation(fields: [sales_channel_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sales_channel SalesChannels? @relation(fields: [sales_channel_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   package_size  PackageSizes? @relation(fields: [package_size_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   created_by    Users         @relation("SaleCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
 

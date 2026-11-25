@@ -10,6 +10,7 @@ import {
   type MasterDataEntity,
   type RelationCounts,
 } from "./master-data-rules";
+import { nextChannelActiveState } from "./settings/sales-channel-settings-helpers";
 
 const RELATED_CASES: Array<{
   entity: MasterDataEntity;
@@ -94,5 +95,15 @@ describe("Master Data Validation & Safe Delete", () => {
     expect(() =>
       assertValidMasterDataInput({ selling_price: "0" }),
     ).toThrow(/Harga jual/);
+  });
+});
+
+describe("Status Kanal Penjualan", () => {
+  it("mengaktifkan kanal yang nonaktif", () => {
+    expect(nextChannelActiveState(false)).toBe(true);
+  });
+
+  it("menonaktifkan kanal yang aktif", () => {
+    expect(nextChannelActiveState(true)).toBe(false);
   });
 });

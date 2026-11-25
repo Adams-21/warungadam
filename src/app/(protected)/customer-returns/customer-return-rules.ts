@@ -1,4 +1,4 @@
-import { Prisma, ReturnCondition } from "@prisma/client";
+import { Prisma, ReturnCondition, ReturnFundStatus } from "@prisma/client";
 import {
   roundToBigInt,
   toMoney,
@@ -28,6 +28,50 @@ export type CustomerReturnItemInput = {
   condition: ReturnCondition;
   unit_cost?: bigint | number | string;
 };
+
+export type CustomerReturnSaleItemVariant = {
+  id: string;
+  variant_id: string;
+};
+
+export function firstValue(
+  value: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export function validateCustomerReturnSaleItemVariants(
+  items: readonly CustomerReturnItemInput[],
+  saleItems: readonly CustomerReturnSaleItemVariant[],
+): string | null {
+  for (const item of items) {
+    if (!item.sale_item_id) continue;
+    const saleItem = saleItems.find((row) => row.id === item.sale_item_id);
+    if (!saleItem) {
+      return "Barang retur tidak ditemukan pada transaksi asal.";
+    }
+    if (saleItem.variant_id !== item.variant_id) {
+      return "Varian barang retur tidak sesuai dengan item transaksi asal.";
+    }
+  }
+  return null;
+}
+
+export function resolveRefundPaidDate({
+  nextStatus,
+  currentStatus,
+  currentPaidDate,
+  submittedDate,
+}: {
+  nextStatus: ReturnFundStatus;
+  currentStatus: ReturnFundStatus;
+  currentPaidDate: Date | null;
+  submittedDate: Date | null;
+}): Date | null {
+  if (nextStatus !== ReturnFundStatus.Dana_dikembalikan) return null;
+  if (nextStatus === currentStatus && currentPaidDate) return currentPaidDate;
+  return submittedDate;
+}
 
 export type BatchRestoration = {
   allocation_id: string;

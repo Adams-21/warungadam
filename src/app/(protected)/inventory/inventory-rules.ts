@@ -3,6 +3,7 @@ import {
   Prisma,
   StockMovementType,
 } from "@prisma/client";
+import { uuidSchema } from "@/lib/schemas";
 import {
   allocateFifoBatches,
   roundToBigInt,
@@ -16,6 +17,32 @@ function toDecimal(value: DecimalInput): Prisma.Decimal {
   return value instanceof Prisma.Decimal
     ? value
     : new Prisma.Decimal(value.toString());
+}
+
+export type InventoryItemFilter = {
+  variant_id?: string;
+  packaging_material_id?: string;
+};
+
+export function buildInventoryItemFilter(
+  itemType: "product",
+  itemId: string,
+): { variant_id?: string };
+export function buildInventoryItemFilter(
+  itemType: "packaging",
+  itemId: string,
+): { packaging_material_id?: string };
+export function buildInventoryItemFilter(
+  itemType: "product" | "packaging",
+  itemId: string,
+): InventoryItemFilter {
+  const id = itemId.trim();
+  if (!id || !uuidSchema.safeParse(id).success) {
+    return {};
+  }
+  return itemType === "product"
+    ? { variant_id: id }
+    : { packaging_material_id: id };
 }
 
 export type StockAdjustmentInput = {

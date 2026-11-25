@@ -12,6 +12,7 @@ import {
 import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import { formatNumber, formatRupiah } from "@/lib/format";
+import { humanizeStatusLabel } from "@/lib/status-labels";
 import { useActionState, useState } from "react";
 import { createSupplierReturnAction } from "./actions";
 import type { SupplierReturnPurchaseView } from "./types";
@@ -140,7 +141,7 @@ export function NewSupplierReturnForm({
           >
             {resolutions.map((resolution) => (
               <option key={resolution} value={resolution}>
-                {resolution}
+                {humanizeStatusLabel(resolution)}
               </option>
             ))}
           </SelectField>

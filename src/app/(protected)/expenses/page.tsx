@@ -19,14 +19,17 @@ import {
 } from "@/components/ui";
 import { SelectField } from "@/components/select-field";
 import { requireAuth } from "@/lib/auth";
+import { toDateInputValue } from "@/lib/date-range";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { resolveExpenseDateFilter } from "./expense-filter-helpers";
 import {
   ExpenseCategoryManager,
   ExpenseFormModal,
   VoidExpenseModal,
 } from "./expense-manager";
-import { aggregateExpenses, calculateProfitLoss } from "./expense-rules";
+import { aggregateExpenses } from "./expense-rules";
+import { calculateExpenseProfit } from "./expense-profit-helpers";
 import type {
   ExpenseCategoryTotalView,
   ExpenseCategoryView,
@@ -41,35 +44,6 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function firstValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function toInputDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseDateBoundary(value: string, endOfDay: boolean): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(
-    year,
-    month - 1,
-    day,
-    endOfDay ? 23 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 999 : 0,
-  );
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-  return date;
 }
 
 export default async function ExpensesPage({
@@ -96,19 +70,28 @@ export default async function ExpensesPage({
 
   const rawDateFrom = (firstValue(params.date_from) ?? "").trim();
   const rawDateTo = (firstValue(params.date_to) ?? "").trim();
-  const fromDate =
-    parseDateBoundary(rawDateFrom, false) ?? defaultFrom;
-  const toDate = parseDateBoundary(rawDateTo, true) ?? today;
+  const dateFilter = resolveExpenseDateFilter(rawDateFrom, rawDateTo, {
+    from: defaultFrom,
+    to: today,
+  });
+  const queryRange = dateFilter.error
+    ? { gte: new Date(0), lte: new Date(0) }
+    : {
+        gte: dateFilter.bounds?.gte ?? defaultFrom,
+        lte: dateFilter.bounds?.lte ?? today,
+      };
   const filters: ExpenseFilterValues = {
     q: (firstValue(params.q) ?? "").trim(),
     category_id: selectedCategoryId,
-    date_from: toInputDate(fromDate),
-    date_to: toInputDate(toDate),
+    date_from: toDateInputValue(dateFilter.from),
+    date_to: toDateInputValue(dateFilter.to),
     include_void: firstValue(params.include_void) === "1",
   };
 
   const expenseWhere: Prisma.ExpensesWhereInput = {
-    expense_date: { gte: fromDate, lte: toDate },
+    ...(dateFilter.error
+      ? { id: { in: [] } }
+      : { expense_date: { gte: queryRange.gte, lte: queryRange.lte } }),
     ...(filters.q
       ? { description: { contains: filters.q, mode: "insensitive" as const } }
       : {}),
@@ -118,42 +101,68 @@ export default async function ExpensesPage({
     ...(filters.include_void ? {} : { is_void: false }),
   };
 
-  const [expensesRaw, periodExpensesRaw, sales] = await Promise.all([
-    prisma.expenses.findMany({
-      where: expenseWhere,
-      include: {
-        expense_category: { select: { name: true } },
-        created_by: { select: { username: true } },
-        voided_by: { select: { username: true } },
-      },
-      orderBy: [{ expense_date: "desc" }, { created_at: "desc" }],
-    }),
-    prisma.expenses.findMany({
-      where: {
-        is_void: false,
-        expense_date: { gte: fromDate, lte: toDate },
-      },
-      select: {
-        expense_category_id: true,
-        expense_date: true,
-        amount: true,
-        is_void: true,
-        expense_category: { select: { name: true } },
-      },
-    }),
-    prisma.sales.findMany({
-      where: { transaction_date: { gte: fromDate, lte: toDate } },
-      select: {
-        total_amount: true,
-        items: { select: { total_hpp_fifo: true } },
-        packaging_usages: { select: { calculated_hpp: true } },
-      },
-    }),
-  ]);
+  const [expensesRaw, periodExpensesRaw, sales, refunds, writeOffs] =
+    await Promise.all([
+      prisma.expenses.findMany({
+        where: expenseWhere,
+        include: {
+          expense_category: { select: { name: true } },
+          created_by: { select: { username: true } },
+          voided_by: { select: { username: true } },
+        },
+        orderBy: [{ expense_date: "desc" }, { created_at: "desc" }],
+      }),
+      prisma.expenses.findMany({
+        where: {
+          is_void: false,
+          expense_date: { gte: queryRange.gte, lte: queryRange.lte },
+        },
+        select: {
+          expense_category_id: true,
+          expense_date: true,
+          amount: true,
+          is_void: true,
+          expense_category: { select: { name: true } },
+        },
+      }),
+      prisma.sales.findMany({
+        where: { transaction_date: { gte: queryRange.gte, lte: queryRange.lte } },
+        select: {
+          id: true,
+          transaction_number: true,
+          transaction_date: true,
+          order_status: true,
+          payment_status: true,
+          settlement_status: true,
+          total_amount: true,
+          admin_fee_estimate_amount: true,
+          admin_fee_actual_amount: true,
+          items: { select: { total_hpp_fifo: true } },
+          packaging_usages: {
+            select: { calculated_hpp: true, adjusted_hpp: true },
+          },
+        },
+      }),
+      prisma.customerReturns.findMany({
+        where: {
+          refund_paid_date: { gte: queryRange.gte, lte: queryRange.lte },
+          fund_status: "Dana_dikembalikan",
+        },
+        select: {
+          refund_paid_date: true,
+          refund_amount: true,
+          fund_status: true,
+        },
+      }),
+      prisma.stockWriteOffs.findMany({
+        where: { created_at: { gte: queryRange.gte, lte: queryRange.lte } },
+        select: { created_at: true, loss_value: true },
+      }),
+    ]);
 
   const expenseViews: ExpenseView[] = expensesRaw.map((expense) => ({
     id: expense.id,
-    expense_date: toInputDate(expense.expense_date),
+    expense_date: toDateInputValue(expense.expense_date),
     amount: Number(expense.amount),
     description: expense.description,
     is_void: expense.is_void,
@@ -177,51 +186,58 @@ export default async function ExpensesPage({
     periodExpensesRaw.map((expense) => ({
       expense_category_id: expense.expense_category_id,
       expense_date: expense.expense_date,
-      amount: expense.amount,
+      amount: expense.amount.toString(),
       is_void: expense.is_void,
       category_name: expense.expense_category.name,
     })),
-    { dateFrom: fromDate, dateTo: toDate },
+    { dateFrom: queryRange.gte, dateTo: queryRange.lte },
   );
 
-  const salesTotals = sales.reduce(
-    (acc, sale) => ({
-      totalRevenue: acc.totalRevenue + sale.total_amount,
-      productCogs:
-        acc.productCogs +
-        sale.items.reduce(
-          (sum, item) => sum + item.total_hpp_fifo,
-          BigInt(0),
-        ),
-      packagingCogs:
-        acc.packagingCogs +
-        sale.packaging_usages.reduce(
-          (sum, usage) => sum + usage.calculated_hpp,
-          BigInt(0),
-        ),
-    }),
-    {
-      totalRevenue: BigInt(0),
-      productCogs: BigInt(0),
-      packagingCogs: BigInt(0),
-    },
-  );
-
-  const profitLoss = calculateProfitLoss({
-    totalRevenue: salesTotals.totalRevenue,
-    productCogs: salesTotals.productCogs,
-    packagingCogs: salesTotals.packagingCogs,
-    totalOperatingExpenses: periodAggregation.total,
+  const profit = calculateExpenseProfit({
+    from: queryRange.gte,
+    to: queryRange.lte,
+    sales: sales.map((sale) => ({
+      id: sale.id,
+      transaction_number: sale.transaction_number,
+      transaction_date: sale.transaction_date,
+      order_status: sale.order_status,
+      payment_status: sale.payment_status,
+      settlement_status: sale.settlement_status,
+      total_amount: sale.total_amount.toString(),
+      admin_fee_estimate_amount: sale.admin_fee_estimate_amount.toString(),
+      admin_fee_actual_amount: sale.admin_fee_actual_amount?.toString() ?? null,
+      items: sale.items.map((item) => ({
+        total_hpp_fifo: item.total_hpp_fifo.toString(),
+      })),
+      packaging_usages: sale.packaging_usages.map((usage) => ({
+        calculated_hpp: usage.calculated_hpp.toString(),
+        adjusted_hpp: usage.adjusted_hpp?.toString() ?? null,
+      })),
+    })),
+    refunds: refunds.map((refund) => ({
+      refund_paid_date: refund.refund_paid_date,
+      refund_amount: refund.refund_amount.toString(),
+      fund_status: refund.fund_status,
+    })),
+    expenses: periodExpensesRaw.map((expense) => ({
+      expense_date: expense.expense_date,
+      amount: expense.amount.toString(),
+      is_void: expense.is_void,
+    })),
+    writeOffs: writeOffs.map((writeOff) => ({
+      created_at: writeOff.created_at,
+      loss_value: writeOff.loss_value.toString(),
+    })),
   });
 
   const summary: ExpenseSummaryView = {
-    totalRevenue: Number(profitLoss.totalRevenue),
-    productCogs: Number(salesTotals.productCogs),
-    packagingCogs: Number(salesTotals.packagingCogs),
-    totalCogs: Number(profitLoss.totalCogs),
-    grossProfit: Number(profitLoss.grossProfit),
-    totalOperatingExpenses: Number(profitLoss.totalOperatingExpenses),
-    netProfit: Number(profitLoss.netProfit),
+    totalRevenue: Number(profit.totalRevenue),
+    productCogs: Number(profit.productCogs),
+    packagingCogs: Number(profit.packagingCogs),
+    totalCogs: Number(profit.totalCogs),
+    grossProfit: Number(profit.grossProfit),
+    totalOperatingExpenses: Number(profit.totalOperatingExpenses),
+    netProfit: Number(profit.netProfit),
   };
 
   const breakdown: ExpenseCategoryTotalView[] = periodAggregation.byCategory.map(
@@ -283,6 +299,14 @@ export default async function ExpensesPage({
         {formatRupiah(summary.productCogs)} · HPP kemasan{" "}
         {formatRupiah(summary.packagingCogs)}
       </p>
+      <p className="mt-1 text-sm text-slate-600">
+        Admin {formatRupiah(Number(profit.adminFee))} · Refund dibayar{" "}
+        {formatRupiah(Number(profit.refunds))} · Penghapusan stok{" "}
+        {formatRupiah(Number(profit.writeOffLoss))}
+      </p>
+      {dateFilter.error ? (
+        <p className="mt-1 text-sm text-rose-600">{dateFilter.error}</p>
+      ) : null}
 
       <div className="mt-6">
         <Panel

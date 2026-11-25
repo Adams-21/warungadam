@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { Prisma } from "@prisma/client";
 import {
   Button,
   DateRangeFields,
@@ -18,10 +17,10 @@ import {
   secondaryButtonClass,
 } from "@/components/ui";
 import { SelectField } from "@/components/select-field";
-import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { PurchaseTabs } from "./purchase-tabs";
+import { buildPurchaseListWhere } from "./purchase-rules";
 import {
   PAYMENT_STATUSES,
   PURCHASE_STATUSES,
@@ -51,23 +50,16 @@ export default async function PurchasesPage({
   const dateFrom = firstValue(query.date_from);
   const dateTo = firstValue(query.date_to);
 
-  const status = PURCHASE_STATUSES.includes(statusRaw as (typeof PURCHASE_STATUSES)[number])
-    ? statusRaw
-    : "";
-  const paymentStatus = PAYMENT_STATUSES.includes(
-    paymentRaw as (typeof PAYMENT_STATUSES)[number],
-  )
-    ? paymentRaw
-    : "";
-
-  const where: Prisma.PurchasesWhereInput = {};
-  if (status) where.status = status as (typeof PURCHASE_STATUSES)[number];
-  if (supplierRaw) where.supplier_id = supplierRaw;
-  if (paymentStatus) {
-    where.payment_status = paymentStatus as (typeof PAYMENT_STATUSES)[number];
-  }
-  const dateBounds = buildDateBounds(dateFrom, dateTo);
-  if (dateBounds) where.purchase_date = dateBounds;
+  const where = buildPurchaseListWhere({
+    status: statusRaw,
+    supplier_id: supplierRaw,
+    payment_status: paymentRaw,
+    date_from: dateFrom,
+    date_to: dateTo,
+  });
+  const status = typeof where.status === "string" ? where.status : "";
+  const paymentStatus =
+    typeof where.payment_status === "string" ? where.payment_status : "";
 
   const [rows, suppliers] = await Promise.all([
     prisma.purchases.findMany({

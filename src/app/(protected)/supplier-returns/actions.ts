@@ -14,7 +14,9 @@ import { generateDocumentNumber } from "@/lib/sequence";
 import { resolveSupplierPayment } from "../purchases/purchase-rules";
 import {
   calculateSupplierReturnAmount,
+  isBlankSupplierReturnAmount,
   planSupplierReturnItems,
+  resolveSupplierReturnAmount,
   validateSupplierReturnAmount,
   validateSupplierReturnItems,
   type SupplierReturnItemInput,
@@ -36,7 +38,10 @@ const createSupplierReturnSchema = z.object({
   purchase_id: uuidSchema,
   return_date: z.date(),
   resolution_type: z.nativeEnum(SupplierReturnResolution),
-  return_amount: priceSchema,
+  return_amount: z.preprocess(
+    (value) => (isBlankSupplierReturnAmount(value) ? "0" : value),
+    priceSchema,
+  ),
   settlement_date: z.preprocess(
     (value) => (value === "" || value === null || value === undefined ? null : value),
     z.string().nullable(),
@@ -72,12 +77,13 @@ export async function createSupplierReturnAction(
     const variantIds = formData.getAll("variant_id");
     const quantities = formData.getAll("qty");
     const unitPrices = formData.getAll("unit_price");
+    const rawReturnAmount = formData.get("return_amount");
 
     const parsed = createSupplierReturnSchema.safeParse({
       purchase_id: formData.get("purchase_id"),
       return_date: parseDateInput(formData.get("return_date")),
       resolution_type: formData.get("resolution_type"),
-      return_amount: formData.get("return_amount") ?? "0",
+      return_amount: rawReturnAmount,
       settlement_date: formData.get("settlement_date"),
       reason: formData.get("reason"),
       items: receiptItemIds
@@ -172,9 +178,13 @@ export async function createSupplierReturnAction(
       if (itemError) throw new ActionError(itemError);
 
       const calculatedAmount = calculateSupplierReturnAmount(items);
+      const returnAmount = resolveSupplierReturnAmount(
+        rawReturnAmount,
+        calculatedAmount,
+      );
       const amountError = validateSupplierReturnAmount({
         calculated_amount: calculatedAmount,
-        return_amount: parsed.data.return_amount,
+        return_amount: returnAmount,
         remaining_amount: purchase.remaining_amount,
         resolution_type: parsed.data.resolution_type,
         settlement_date: settlementDate,
@@ -190,7 +200,7 @@ export async function createSupplierReturnAction(
           return_date: parsed.data.return_date,
           resolution_type: parsed.data.resolution_type,
           calculated_return_amount: calculatedAmount,
-          return_amount: parsed.data.return_amount,
+          return_amount: returnAmount,
           settlement_date: settlementDate,
           reason: parsed.data.reason,
           created_by_id: user.id,
@@ -296,7 +306,7 @@ export async function createSupplierReturnAction(
             remaining_amount: purchase.remaining_amount,
             status: purchase.status,
           },
-          parsed.data.return_amount,
+          returnAmount,
         );
         await tx.purchases.update({
           where: { id: purchase.id },
@@ -311,7 +321,7 @@ export async function createSupplierReturnAction(
       await logActivity(tx, user.id, "SupplierReturns", header.id, "CREATE", {
         return_number: returnNumber,
         resolution_type: parsed.data.resolution_type,
-        return_amount: parsed.data.return_amount.toString(),
+        return_amount: returnAmount.toString(),
         reason: parsed.data.reason,
       });
 

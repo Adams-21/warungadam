@@ -45,9 +45,17 @@ describe("buildDateBounds", () => {
     expect(bounds?.lte).toEqual(new Date(2026, 2, 3, 23, 59, 59, 999));
   });
 
+  it("mendukung batas hanya dari atau hanya sampai", () => {
+    expect(buildDateBounds("2026-03-01", "")?.gte).toEqual(new Date(2026, 2, 1));
+    expect(buildDateBounds("", "2026-03-03")?.lte).toEqual(
+      new Date(2026, 2, 3, 23, 59, 59, 999),
+    );
+  });
+
   it("mengembalikan null untuk tanggal kosong atau tidak valid", () => {
     expect(buildDateBounds("", "")).toBeNull();
     expect(buildDateBounds("2026-13-01", "2026-03-03")).toBeNull();
+    expect(buildDateBounds("2026-02-30", "2026-03-03")).toBeNull();
   });
 });
 

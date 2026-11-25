@@ -7,6 +7,7 @@ import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { parseStrictDateInput } from "@/lib/date-range";
 import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import {
@@ -43,10 +44,8 @@ const REVALIDATE_PATHS = [
   "/dashboard",
 ];
 
-function parseDateInput(value: FormDataEntryValue | null): Date | null {
-  if (typeof value !== "string" || value.trim() === "") return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+function parseFormDate(value: FormDataEntryValue | null): Date | null {
+  return typeof value === "string" ? parseStrictDateInput(value) : null;
 }
 
 export async function createPackagingPurchaseAction(
@@ -59,7 +58,7 @@ export async function createPackagingPurchaseAction(
     const unitPrices = formData.getAll("unit_price");
 
     const parsed = createPackagingPurchaseSchema.safeParse({
-      purchase_date: parseDateInput(formData.get("purchase_date")),
+      purchase_date: parseFormDate(formData.get("purchase_date")),
       notes: formData.get("notes"),
       items: materialIds.map((materialId, index) => ({
         packaging_material_id: materialId,
@@ -79,61 +78,65 @@ export async function createPackagingPurchaseAction(
 
     const user = await requireAuth();
 
-    const materials = await prisma.packagingMaterials.findMany({
-      where: { id: { in: ids }, is_active: true },
-      select: {
-        id: true,
-        conversion_factor: true,
-        stock_qty: true,
-        average_unit_cost: true,
-      },
-    });
+    const purchase = await prisma.$transaction(async (tx) => {
+      const materials = await tx.packagingMaterials.findMany({
+        where: { id: { in: ids }, is_active: true },
+        select: {
+          id: true,
+          conversion_factor: true,
+          stock_qty: true,
+          average_unit_cost: true,
+        },
+      });
 
-    if (materials.length !== ids.length) {
-      throw new ActionError(
-        "Sebagian material tidak ditemukan atau tidak aktif.",
-      );
-    }
-
-    const materialMap = new Map(materials.map((material) => [material.id, material]));
-    const lines = parsed.data.items.map((item) => {
-      const material = materialMap.get(item.packaging_material_id);
-      if (!material) {
-        throw new ActionError("Material tidak ditemukan.");
+      if (materials.length !== ids.length) {
+        throw new ActionError(
+          "Sebagian material tidak ditemukan atau tidak aktif.",
+        );
       }
 
-      const purchaseQty = new Prisma.Decimal(item.purchase_qty.toString());
-      const usageQty = convertPurchaseToUsageQty(
-        purchaseQty,
-        material.conversion_factor,
+      const materialMap = new Map(
+        materials.map((material) => [material.id, material]),
       );
-      const subtotal = calculateItemSubtotal({
-        ordered_qty: purchaseQty,
-        unit_price: item.unit_price,
+      const lines = parsed.data.items.map((item) => {
+        const material = materialMap.get(item.packaging_material_id);
+        if (!material) {
+          throw new ActionError("Material tidak ditemukan.");
+        }
+
+        const purchaseQty = new Prisma.Decimal(item.purchase_qty.toString());
+        const usageQty = convertPurchaseToUsageQty(
+          purchaseQty,
+          material.conversion_factor,
+        );
+        const subtotal = calculateItemSubtotal({
+          ordered_qty: purchaseQty,
+          unit_price: item.unit_price,
+        });
+        const nextAverage = calculateWeightedAverageUnitCost({
+          currentStock: material.stock_qty,
+          currentAverageCost: material.average_unit_cost,
+          purchaseSubtotal: subtotal,
+          usageQty,
+        });
+
+        return {
+          materialId: material.id,
+          currentStock: material.stock_qty,
+          currentAverageCost: material.average_unit_cost,
+          purchaseQty,
+          usageQty,
+          unitPrice: item.unit_price,
+          subtotal,
+          nextAverage,
+        };
       });
-      const nextAverage = calculateWeightedAverageUnitCost({
-        currentStock: material.stock_qty,
-        currentAverageCost: material.average_unit_cost,
-        purchaseSubtotal: subtotal,
-        usageQty,
-      });
 
-      return {
-        materialId: material.id,
-        purchaseQty,
-        usageQty,
-        unitPrice: item.unit_price,
-        subtotal,
-        nextAverage,
-      };
-    });
+      const totalAmount = lines.reduce(
+        (sum, line) => sum + line.subtotal,
+        BigInt(0),
+      );
 
-    const totalAmount = lines.reduce(
-      (sum, line) => sum + line.subtotal,
-      BigInt(0),
-    );
-
-    const purchase = await prisma.$transaction(async (tx) => {
       const purchaseNumber = await generateDocumentNumber(
         "PACKAGING_PURCHASE",
         tx,
@@ -174,13 +177,22 @@ export async function createPackagingPurchaseAction(
           throw new ActionError("Item pembelian kemasan gagal dibuat.");
         }
 
-        await tx.packagingMaterials.update({
-          where: { id: line.materialId },
+        const claimedMaterial = await tx.packagingMaterials.updateMany({
+          where: {
+            id: line.materialId,
+            stock_qty: line.currentStock,
+            average_unit_cost: line.currentAverageCost,
+          },
           data: {
             stock_qty: { increment: line.usageQty },
             average_unit_cost: line.nextAverage,
           },
         });
+        if (claimedMaterial.count !== 1) {
+          throw new ActionError(
+            "Stok kemasan berubah saat transaksi. Silakan coba lagi.",
+          );
+        }
 
         await tx.packagingMovements.create({
           data: {

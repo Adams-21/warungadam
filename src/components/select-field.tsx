@@ -7,18 +7,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui";
+import { useState, type ReactNode } from "react";
 import {
-  Children,
-  isValidElement,
-  useState,
-  type ReactNode,
-} from "react";
-
-type OptionProps = {
-  value?: string | number;
-  children?: ReactNode;
-  disabled?: boolean;
-};
+  collectSelectFieldOptions,
+  resolveSelectFieldLabel,
+} from "./select-field-helpers";
 
 export function SelectField({
   name,
@@ -41,16 +34,10 @@ export function SelectField({
 }) {
   const [value, setValue] = useState(String(defaultValue ?? ""));
 
-  const options = Children.toArray(children).flatMap((child) => {
-    if (!isValidElement(child)) return [];
-    const props = child.props as OptionProps;
-    const optionValue = String(props.value ?? "");
-    return [
-      <SelectItem key={optionValue} value={optionValue} disabled={props.disabled}>
-        {props.children}
-      </SelectItem>,
-    ];
-  });
+  const options = collectSelectFieldOptions(children);
+  const matchedOption = options.find((option) => option.value === value);
+  const selectedLabel = resolveSelectFieldLabel(options, value, placeholder);
+  const isPlaceholder = !matchedOption || !matchedOption.label;
 
   return (
     <>
@@ -67,9 +54,23 @@ export function SelectField({
         }}
       >
         <SelectTrigger id={id} className={className}>
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={placeholder}>
+            <span className={isPlaceholder ? "text-muted-foreground" : undefined}>
+              {selectedLabel}
+            </span>
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent>{options}</SelectContent>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              disabled={option.disabled}
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
       </Select>
     </>
   );

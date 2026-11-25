@@ -1,10 +1,19 @@
 "use client";
 
 import { useActionState } from "react";
-import { ActionMessage, Input, Label, SubmitButton } from "@/components/ui";
+import {
+  ActionMessage,
+  Input,
+  Label,
+  SubmitButton,
+  secondaryButtonClass,
+} from "@/components/ui";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import { formatRupiah } from "@/lib/format";
-import { recordSupplierPaymentAction } from "./actions";
+import {
+  recordSupplierPaymentAction,
+  voidSupplierPaymentAction,
+} from "./actions";
 
 export function SupplierPaymentForm({
   purchaseId,
@@ -70,6 +79,37 @@ export function SupplierPaymentForm({
       </div>
       <ActionMessage state={state} />
       <SubmitButton pending={pending}>Simpan Pembayaran</SubmitButton>
+    </form>
+  );
+}
+
+export function VoidSupplierPaymentForm({
+  purchaseId,
+  paymentId,
+}: {
+  purchaseId: string;
+  paymentId: string;
+}) {
+  const [state, formAction, pending] = useActionState(
+    voidSupplierPaymentAction,
+    EMPTY_ACTION_STATE,
+  );
+
+  return (
+    <form action={formAction} className="mt-2 space-y-2">
+      <input type="hidden" name="purchase_id" value={purchaseId} />
+      <input type="hidden" name="payment_id" value={paymentId} />
+      <Input
+        name="void_reason"
+        required
+        maxLength={500}
+        placeholder="Alasan pembatalan pembayaran"
+        className="h-8 bg-white"
+      />
+      <SubmitButton pending={pending} className={secondaryButtonClass}>
+        Batalkan Pembayaran
+      </SubmitButton>
+      <ActionMessage state={state} />
     </form>
   );
 }

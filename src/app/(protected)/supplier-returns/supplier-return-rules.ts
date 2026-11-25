@@ -1,5 +1,5 @@
 import { Prisma, SupplierReturnResolution } from "@prisma/client";
-import { roundToBigInt } from "../purchases/purchase-rules";
+import { roundToBigInt, toMoney } from "../purchases/purchase-rules";
 
 export type SupplierReturnItemInput = {
   goods_receipt_item_id: string;
@@ -22,6 +22,28 @@ export type SupplierReturnReceiptContext = {
 export type SupplierReturnPlanItem = SupplierReturnItemInput & {
   subtotal: bigint;
 };
+
+export function firstValue(
+  value: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export function isBlankSupplierReturnAmount(value: unknown): boolean {
+  return (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  );
+}
+
+export function resolveSupplierReturnAmount(
+  value: unknown,
+  calculatedAmount: bigint,
+): bigint {
+  if (isBlankSupplierReturnAmount(value)) return calculatedAmount;
+  return toMoney(String(value));
+}
 
 export function validateSupplierReturnItems(
   items: SupplierReturnItemInput[],
@@ -97,6 +119,12 @@ export function validateSupplierReturnAmount({
 }): string | null {
   if (return_amount < BigInt(0)) {
     return "Nominal retur tidak boleh negatif.";
+  }
+  if (
+    resolution_type === SupplierReturnResolution.POTONGAN_TAGIHAN &&
+    return_amount === BigInt(0)
+  ) {
+    return "Nominal potongan tagihan harus lebih dari 0.";
   }
   if (return_amount > calculated_amount) {
     return "Nominal retur tidak boleh melebihi nilai barang yang diretur.";

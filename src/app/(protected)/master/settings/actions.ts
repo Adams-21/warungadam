@@ -1,17 +1,22 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/lib/action-state";
+import { ActionError } from "@/lib/action-error";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
 import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { optionalTextSchema, uuidSchema } from "@/lib/schemas";
+import { nextChannelActiveState } from "./sales-channel-settings-helpers";
+import {
+  parseSessionTimeoutMinutes,
+  resolveBusinessSettingsId,
+} from "./settings-helpers";
 
 const settingsSchema = z.object({
-  id: z.string(),
+  id: z.string().trim(),
   business_name: z
     .string()
     .trim()
@@ -24,11 +29,14 @@ const settingsSchema = z.object({
     .finite()
     .min(0, "Rate tidak boleh negatif")
     .max(100, "Rate maksimal 100"),
-  session_timeout_minutes: z.coerce
-    .number()
-    .int()
-    .min(1, "Minimal 1 menit")
-    .max(1440, "Maksimal 1440 menit"),
+  session_timeout_minutes: z.preprocess(
+    (value) => parseSessionTimeoutMinutes(value) ?? 0,
+    z
+      .number()
+      .int()
+      .min(1, "Minimal 1 menit")
+      .max(1440, "Maksimal 1440 menit"),
+  ),
 });
 
 const namedSchema = z.object({
@@ -36,8 +44,12 @@ const namedSchema = z.object({
 });
 
 const REVALIDATE_PATHS = [
+  "/settings",
+  "/expenses",
   "/master/settings",
   "/master/products",
+  "/sales",
+  "/sales/new",
   "/dashboard",
 ];
 
@@ -70,26 +82,20 @@ export async function updateBusinessSettingsAction(
     }
 
     const user = await requireAuth();
-    const validId = uuidSchema.safeParse(parsed.data.id);
-    const targetId = validId.success ? validId.data : randomUUID();
 
     const saved = await prisma.$transaction(async (tx) => {
-      const existing = await tx.businessSettings.findUnique({
-        where: { id: targetId },
-        select: { id: true },
+      const records = await tx.businessSettings.findMany({
+        orderBy: { updated_at: "desc" },
+        select: { id: true, updated_at: true },
       });
+      const targetId = resolveBusinessSettingsId(parsed.data.id, records);
+      if (!targetId) {
+        throw new ActionError("Data pengaturan bisnis tidak ditemukan.");
+      }
 
-      const result = await tx.businessSettings.upsert({
+      const result = await tx.businessSettings.update({
         where: { id: targetId },
-        create: {
-          id: targetId,
-          business_name: parsed.data.business_name,
-          address: parsed.data.address,
-          phone: parsed.data.phone,
-          default_admin_fee_rate: parsed.data.default_admin_fee_rate,
-          session_timeout_minutes: parsed.data.session_timeout_minutes,
-        },
-        update: {
+        data: {
           business_name: parsed.data.business_name,
           address: parsed.data.address,
           phone: parsed.data.phone,
@@ -103,7 +109,7 @@ export async function updateBusinessSettingsAction(
         user.id,
         "BusinessSettings",
         result.id,
-        existing ? "UPDATE" : "CREATE",
+        "UPDATE",
         {
           business_name: result.business_name,
           default_admin_fee_rate: result.default_admin_fee_rate.toString(),
@@ -165,16 +171,16 @@ export async function toggleSalesChannelActiveAction(
     }
 
     const user = await requireAuth();
-    const existing = await prisma.salesChannels.findUnique({
-      where: { id: parsedId.data },
-      select: { is_active: true },
-    });
-    if (!existing) {
-      return { error: "Kanal penjualan tidak ditemukan." };
-    }
-
-    const nextValue = !existing.is_active;
     await prisma.$transaction(async (tx) => {
+      const existing = await tx.salesChannels.findUnique({
+        where: { id: parsedId.data },
+        select: { is_active: true },
+      });
+      if (!existing) {
+        throw new ActionError("Kanal penjualan tidak ditemukan.");
+      }
+
+      const nextValue = nextChannelActiveState(existing.is_active);
       await tx.salesChannels.update({
         where: { id: parsedId.data },
         data: { is_active: nextValue },
@@ -231,16 +237,17 @@ export async function toggleExpenseCategoryActiveAction(
     }
 
     const user = await requireAuth();
-    const existing = await prisma.expenseCategories.findUnique({
-      where: { id: parsedId.data },
-      select: { is_active: true },
-    });
-    if (!existing) {
-      return { error: "Kategori pengeluaran tidak ditemukan." };
-    }
 
-    const nextValue = !existing.is_active;
     await prisma.$transaction(async (tx) => {
+      const existing = await tx.expenseCategories.findUnique({
+        where: { id: parsedId.data },
+        select: { is_active: true },
+      });
+      if (!existing) {
+        throw new ActionError("Kategori pengeluaran tidak ditemukan.");
+      }
+
+      const nextValue = !existing.is_active;
       await tx.expenseCategories.update({
         where: { id: parsedId.data },
         data: { is_active: nextValue },

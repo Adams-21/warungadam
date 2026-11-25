@@ -70,17 +70,17 @@ async function main() {
 
   // 4. Kanal Penjualan (SalesChannels)
   const channelsData = [
+    { name: 'Toko Offline', is_marketplace: false },
+    { name: 'WhatsApp', is_marketplace: false },
     { name: 'Shopee', is_marketplace: true },
     { name: 'Tokopedia', is_marketplace: true },
-    { name: 'Lazada', is_marketplace: true },
     { name: 'TikTok Shop', is_marketplace: true },
-    { name: 'Offline', is_marketplace: false },
   ];
 
   for (const ch of channelsData) {
     await prisma.salesChannels.upsert({
       where: { name: ch.name },
-      update: {},
+      update: { is_marketplace: ch.is_marketplace, is_active: true },
       create: {
         name: ch.name,
         is_marketplace: ch.is_marketplace,
@@ -88,6 +88,14 @@ async function main() {
       },
     });
   }
+
+  await prisma.salesChannels.deleteMany({
+    where: {
+      name: { in: ['Lazada', 'Offline'] },
+      sales: { none: {} },
+      variant_channel_prices: { none: {} },
+    },
+  });
 
   // 5. Kategori Produk & Pengeluaran Awal
   const defaultProductCategories = ['Sembako & Minyak', 'Makanan & Minuman', 'Kebutuhan Rumah Tangga', 'Lainnya'];

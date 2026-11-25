@@ -1,9 +1,12 @@
-import { ReturnCondition } from "@prisma/client";
+import { ReturnCondition, ReturnFundStatus } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   calculateCustomerReturnRefund,
+  firstValue,
   planCustomerReturnRestorations,
+  resolveRefundPaidDate,
   validateCustomerReturnItems,
+  validateCustomerReturnSaleItemVariants,
 } from "./customer-return-rules";
 
 const ALLOCATIONS = [
@@ -76,6 +79,92 @@ describe("Validasi Retur Pelanggan", () => {
         ],
       ),
     ).toContain("tidak boleh negatif");
+  });
+});
+
+describe("Kesesuaian Varian Item Transaksi Retur", () => {
+  const saleItems = [{ id: "item-1", variant_id: "v1" }];
+
+  it("menerima varian yang sama dengan item transaksi asal", () => {
+    expect(
+      validateCustomerReturnSaleItemVariants(
+        [
+          {
+            sale_item_id: "item-1",
+            variant_id: "v1",
+            qty: 1,
+            condition: ReturnCondition.Layak_jual,
+          },
+        ],
+        saleItems,
+      ),
+    ).toBeNull();
+  });
+
+  it("menolak varian berbeda dan item transaksi yang tidak ditemukan", () => {
+    const item = {
+      sale_item_id: "item-1",
+      variant_id: "v2",
+      qty: 1,
+      condition: ReturnCondition.Layak_jual,
+    };
+    expect(validateCustomerReturnSaleItemVariants([item], saleItems)).toContain(
+      "tidak sesuai",
+    );
+    expect(
+      validateCustomerReturnSaleItemVariants(
+        [{ ...item, sale_item_id: "item-90" }],
+        saleItems,
+      ),
+    ).toContain("tidak ditemukan");
+    expect(
+      validateCustomerReturnSaleItemVariants(
+        [{ ...item, sale_item_id: null }],
+        saleItems,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("Tanggal Dana Retur Pelanggan", () => {
+  const paidDate = new Date("2026-02-10T00:00:00.000Z");
+
+  it("mempertahankan tanggal bila status tidak berubah", () => {
+    expect(
+      resolveRefundPaidDate({
+        nextStatus: ReturnFundStatus.Dana_dikembalikan,
+        currentStatus: ReturnFundStatus.Dana_dikembalikan,
+        currentPaidDate: paidDate,
+        submittedDate: null,
+      }),
+    ).toEqual(paidDate);
+  });
+
+  it("memakai tanggal baru saat status berubah dan menghapus saat status lain", () => {
+    const submittedDate = new Date("2026-03-01T00:00:00.000Z");
+    expect(
+      resolveRefundPaidDate({
+        nextStatus: ReturnFundStatus.Dana_dikembalikan,
+        currentStatus: ReturnFundStatus.Belum_diproses,
+        currentPaidDate: null,
+        submittedDate,
+      }),
+    ).toEqual(submittedDate);
+    expect(
+      resolveRefundPaidDate({
+        nextStatus: ReturnFundStatus.Belum_diproses,
+        currentStatus: ReturnFundStatus.Dana_dikembalikan,
+        currentPaidDate: paidDate,
+        submittedDate: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("mengambil nilai pertama dari parameter query", () => {
+    expect(firstValue(undefined)).toBeUndefined();
+    expect(firstValue("RET-1")).toBe("RET-1");
+    expect(firstValue(["RET-1", "RET-2"])).toBe("RET-1");
+    expect(firstValue([])).toBeUndefined();
   });
 });
 

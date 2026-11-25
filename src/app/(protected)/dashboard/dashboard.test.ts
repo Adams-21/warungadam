@@ -99,6 +99,76 @@ describe("Agregasi KPI Dashboard", () => {
     expect(result.kpis.net_profit).toBe(BigInt(625_000));
   });
 
+  it("mengurangi HPP produk dengan restored HPP retur layak jual pada KPI", () => {
+    const cogs = calculateDashboardSaleCogs({
+      items: [
+        {
+          total_hpp_fifo: BigInt(400_000),
+          customer_return_items: [
+            { restored_hpp_amount: BigInt(40_000) },
+            { restored_hpp_amount: BigInt(10_000) },
+          ],
+        },
+      ],
+      packaging_usages: [{ calculated_hpp: BigInt(50_000) }],
+    });
+    const result = aggregateDashboard({
+      period: BASE_PERIOD,
+      sales: [
+        {
+          id: "sale-return",
+          transaction_number: "TRX-RET",
+          transaction_date: "2026-03-01",
+          order_status: "Selesai",
+          total_amount: BigInt(1_000_000),
+          product_cogs: cogs.product_cogs,
+          packaging_cogs: cogs.packaging_cogs,
+          admin_fee_estimate_amount: BigInt(22_000),
+          admin_fee_actual_amount: BigInt(20_000),
+        },
+      ],
+    });
+
+    expect(cogs.product_cogs).toBe(BigInt(350_000));
+    expect(result.kpis.product_cogs).toBe(BigInt(350_000));
+    expect(result.kpis.total_cogs).toBe(BigInt(400_000));
+    expect(result.kpis.gross_profit).toBe(BigInt(580_000));
+    expect(result.kpis.net_profit).toBe(BigInt(580_000));
+    expect(result.daily_trend[0]?.gross_profit).toBe(BigInt(580_000));
+  });
+
+  it("tidak mengurangi HPP produk saat retur tidak memulihkan HPP", () => {
+    const cogs = calculateDashboardSaleCogs({
+      items: [
+        {
+          total_hpp_fifo: BigInt(400_000),
+          customer_return_items: [{ restored_hpp_amount: BigInt(0) }],
+        },
+      ],
+      packaging_usages: [{ calculated_hpp: BigInt(50_000) }],
+    });
+    const result = aggregateDashboard({
+      period: BASE_PERIOD,
+      sales: [
+        {
+          id: "sale-no-restore",
+          transaction_number: "TRX-NO-RET",
+          transaction_date: "2026-03-01",
+          order_status: "Selesai",
+          total_amount: BigInt(1_000_000),
+          product_cogs: cogs.product_cogs,
+          packaging_cogs: cogs.packaging_cogs,
+          admin_fee_estimate_amount: BigInt(20_000),
+        },
+      ],
+    });
+
+    expect(cogs.product_cogs).toBe(BigInt(400_000));
+    expect(result.kpis.product_cogs).toBe(BigInt(400_000));
+    expect(result.kpis.gross_profit).toBe(BigInt(530_000));
+    expect(result.daily_trend[0]?.gross_profit).toBe(BigInt(530_000));
+  });
+
   it("menghitung nilai aset persediaan produk dan kemasan", () => {
     const result = aggregateDashboard({
       period: BASE_PERIOD,
@@ -243,6 +313,49 @@ describe("Tren Dashboard", () => {
     expect(result.monthly_trend[1]?.gross_profit).toBe(BigInt(805_000));
   });
 
+  it("menutup bucket harian dan bulanan tepat di akhir bulan", () => {
+    const result = aggregateDashboard({
+      period: {
+        from: "2026-02-25",
+        to: "2026-02-28",
+        asOf: "2026-03-01",
+      },
+      sales: [
+        {
+          id: "sale-feb",
+          transaction_number: "TRX-FEB",
+          transaction_date: "2026-02-28",
+          order_status: "Selesai",
+          total_amount: BigInt(100_000),
+          product_cogs: BigInt(0),
+          packaging_cogs: BigInt(0),
+          admin_fee_estimate_amount: BigInt(0),
+        },
+        {
+          id: "sale-mar",
+          transaction_number: "TRX-MAR",
+          transaction_date: "2026-03-01",
+          order_status: "Selesai",
+          total_amount: BigInt(999_000),
+          product_cogs: BigInt(0),
+          packaging_cogs: BigInt(0),
+          admin_fee_estimate_amount: BigInt(0),
+        },
+      ],
+    });
+
+    expect(result.daily_trend.map((point) => point.key)).toEqual([
+      "2026-02-25",
+      "2026-02-26",
+      "2026-02-27",
+      "2026-02-28",
+    ]);
+    expect(result.daily_trend[3]?.total_sales).toBe(BigInt(100_000));
+    expect(result.monthly_trend.map((point) => point.key)).toEqual(["2026-02"]);
+    expect(result.monthly_trend[0]?.total_sales).toBe(BigInt(100_000));
+    expect(result.kpis.total_sales).toBe(BigInt(100_000));
+  });
+
   it("mengembalikan lima transaksi terakhir di periode", () => {
     const dates = [
       "2026-03-01T01:00:00",
@@ -286,6 +399,40 @@ describe("calculateDashboardSaleCogs", () => {
 
     expect(result.product_cogs).toBe(BigInt(350_000));
     expect(result.packaging_cogs).toBe(BigInt(20_000));
+  });
+
+  it("menjumlah HPP bersih setelah retur layak jual", () => {
+    const result = calculateDashboardSaleCogs({
+      items: [
+        {
+          total_hpp_fifo: BigInt(100_000),
+          customer_return_items: [
+            { restored_hpp_amount: BigInt(12_000) },
+            { restored_hpp_amount: BigInt(8_000) },
+          ],
+        },
+        { total_hpp_fifo: BigInt(250_000) },
+      ],
+      packaging_usages: [{ calculated_hpp: BigInt(10_000) }],
+    });
+
+    expect(result.product_cogs).toBe(BigInt(330_000));
+    expect(result.packaging_cogs).toBe(BigInt(10_000));
+  });
+
+  it("tidak mengubah HPP saat daftar retur kosong atau restored bernilai nol", () => {
+    const result = calculateDashboardSaleCogs({
+      items: [
+        { total_hpp_fifo: BigInt(100_000), customer_return_items: [] },
+        {
+          total_hpp_fifo: BigInt(250_000),
+          customer_return_items: [{ restored_hpp_amount: BigInt(0) }],
+        },
+      ],
+      packaging_usages: [],
+    });
+
+    expect(result.product_cogs).toBe(BigInt(350_000));
   });
 
   it("mengembalikan nol untuk penjualan tanpa item dan kemasan", () => {

@@ -2,7 +2,10 @@ import { Prisma, SupplierReturnResolution } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   calculateSupplierReturnAmount,
+  firstValue,
+  isBlankSupplierReturnAmount,
   planSupplierReturnItems,
+  resolveSupplierReturnAmount,
   validateSupplierReturnAmount,
   validateSupplierReturnItems,
   type SupplierReturnItemInput,
@@ -116,6 +119,27 @@ describe("Nilai Retur Supplier", () => {
     ).toContain("sisa tagihan");
   });
 
+  it("menolak potongan tagihan dengan nominal nol", () => {
+    expect(
+      validateSupplierReturnAmount({
+        calculated_amount: BigInt(40000),
+        return_amount: BigInt(0),
+        remaining_amount: BigInt(50000),
+        resolution_type: SupplierReturnResolution.POTONGAN_TAGIHAN,
+        settlement_date: null,
+      }),
+    ).toContain("lebih dari 0");
+    expect(
+      validateSupplierReturnAmount({
+        calculated_amount: BigInt(40000),
+        return_amount: BigInt(0),
+        resolution_type: SupplierReturnResolution.BARANG_PENGGANTI,
+        remaining_amount: BigInt(50000),
+        settlement_date: null,
+      }),
+    ).toBeNull();
+  });
+
   it("mewajibkan tanggal realisasi untuk pengembalian uang", () => {
     expect(
       validateSupplierReturnAmount({
@@ -135,5 +159,25 @@ describe("Nilai Retur Supplier", () => {
         settlement_date: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe("Nominal Retur Supplier dari Form", () => {
+  it("menormalkan nilai kosong ke nominal kalkulasi", () => {
+    expect(isBlankSupplierReturnAmount("")).toBe(true);
+    expect(isBlankSupplierReturnAmount("   ")).toBe(true);
+    expect(isBlankSupplierReturnAmount(null)).toBe(true);
+    expect(isBlankSupplierReturnAmount("0")).toBe(false);
+    expect(resolveSupplierReturnAmount("", BigInt(40000))).toBe(BigInt(40000));
+    expect(resolveSupplierReturnAmount(null, BigInt(40000))).toBe(BigInt(40000));
+    expect(resolveSupplierReturnAmount("25000", BigInt(40000))).toBe(BigInt(25000));
+    expect(resolveSupplierReturnAmount("0", BigInt(40000))).toBe(BigInt(0));
+  });
+
+  it("mengambil nilai pertama dari parameter query", () => {
+    expect(firstValue(undefined)).toBeUndefined();
+    expect(firstValue("RET-1")).toBe("RET-1");
+    expect(firstValue(["RET-1", "RET-2"])).toBe("RET-1");
+    expect(firstValue([])).toBeUndefined();
   });
 });

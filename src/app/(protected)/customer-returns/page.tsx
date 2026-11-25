@@ -23,17 +23,19 @@ import {
 import { SelectField } from "@/components/select-field";
 import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
+import { humanizeStatusLabel } from "@/lib/status-labels";
 import { prisma } from "@/lib/prisma";
+import { firstValue } from "./customer-return-rules";
 import type { CustomerReturnListItemView } from "./types";
 
 export const instant = false;
 
 type SearchParams = Promise<{
-  q?: string;
-  claim_status?: string;
-  fund_status?: string;
-  date_from?: string;
-  date_to?: string;
+  q?: string | string[];
+  claim_status?: string | string[];
+  fund_status?: string | string[];
+  date_from?: string | string[];
+  date_to?: string | string[];
 }>;
 
 export default async function CustomerReturnsPage({
@@ -42,19 +44,19 @@ export default async function CustomerReturnsPage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
-  const query = params.q?.trim() ?? "";
-  const dateFrom = params.date_from ?? "";
-  const dateTo = params.date_to ?? "";
-  const claimStatus = Object.values(ReturnClaimStatus).includes(
-    params.claim_status as ReturnClaimStatus,
-  )
-    ? (params.claim_status as ReturnClaimStatus)
-    : undefined;
-  const fundStatus = Object.values(ReturnFundStatus).includes(
-    params.fund_status as ReturnFundStatus,
-  )
-    ? (params.fund_status as ReturnFundStatus)
-    : undefined;
+  const query = firstValue(params.q)?.trim() ?? "";
+  const dateFrom = firstValue(params.date_from) ?? "";
+  const dateTo = firstValue(params.date_to) ?? "";
+  const claimRaw = firstValue(params.claim_status);
+  const fundRaw = firstValue(params.fund_status);
+  const claimStatus =
+    claimRaw && Object.values(ReturnClaimStatus).includes(claimRaw as ReturnClaimStatus)
+      ? (claimRaw as ReturnClaimStatus)
+      : undefined;
+  const fundStatus =
+    fundRaw && Object.values(ReturnFundStatus).includes(fundRaw as ReturnFundStatus)
+      ? (fundRaw as ReturnFundStatus)
+      : undefined;
 
   const where: {
     return_number?: { contains: string; mode: "insensitive" };
@@ -150,7 +152,7 @@ export default async function CustomerReturnsPage({
               <option value="">Semua</option>
               {Object.values(ReturnClaimStatus).map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {humanizeStatusLabel(status)}
                 </option>
               ))}
             </SelectField>
@@ -169,7 +171,7 @@ export default async function CustomerReturnsPage({
               <option value="">Semua</option>
               {Object.values(ReturnFundStatus).map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {humanizeStatusLabel(status)}
                 </option>
               ))}
             </SelectField>

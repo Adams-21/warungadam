@@ -12,22 +12,31 @@ const PROTECTED_PATHS = [
   "/supplier-returns",
   "/expenses",
   "/change-password",
+  "/settings",
 ];
 
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const hasSessionCookie = request.cookies.has(SESSION_COOKIE_NAME);
-
+export function resolveProxyRedirect(
+  pathname: string,
+  hasSessionCookie: boolean,
+): string | null {
   const isProtectedPath = PROTECTED_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
   if (isProtectedPath && !hasSessionCookie) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return "/login";
   }
 
-  if (pathname === "/login" && hasSessionCookie) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  return null;
+}
+
+export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const hasSessionCookie = request.cookies.has(SESSION_COOKIE_NAME);
+  const redirectPath = resolveProxyRedirect(pathname, hasSessionCookie);
+
+  if (redirectPath) {
+    return NextResponse.redirect(new URL(redirectPath, request.url));
   }
 
   return NextResponse.next();
@@ -44,6 +53,7 @@ export const config = {
     "/supplier-returns/:path*",
     "/expenses/:path*",
     "/change-password",
+    "/settings/:path*",
     "/login",
   ],
 };

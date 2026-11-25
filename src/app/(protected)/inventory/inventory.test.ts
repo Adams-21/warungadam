@@ -1,6 +1,7 @@
 import { PackagingMovementType, StockMovementType } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
+  buildInventoryItemFilter,
   calculateInventoryValuation,
   classifyPackagingMovement,
   classifyStockMovement,
@@ -23,6 +24,25 @@ const BATCHES = [
     unit_cost: BigInt(12000),
   },
 ];
+
+describe("Filter UUID Inventaris", () => {
+  const validId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+
+  it("hanya memasukkan id UUID yang valid ke dalam where", () => {
+    expect(buildInventoryItemFilter("product", validId)).toEqual({
+      variant_id: validId,
+    });
+    expect(buildInventoryItemFilter("packaging", validId)).toEqual({
+      packaging_material_id: validId,
+    });
+  });
+
+  it("mengabaikan id kosong atau bukan UUID", () => {
+    expect(buildInventoryItemFilter("product", "invalid-id")).toEqual({});
+    expect(buildInventoryItemFilter("packaging", "   ")).toEqual({});
+    expect(buildInventoryItemFilter("product", "12345")).toEqual({});
+  });
+});
 
 describe("Validasi Penyesuaian Stok", () => {
   it("menerima penyesuaian positif dengan alasan dan HPP", () => {

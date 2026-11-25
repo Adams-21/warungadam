@@ -135,12 +135,44 @@ export async function adjustStockAction(
           },
         });
       } else {
-        let balance = variant.stock_qty;
+        const outgoingQty = plan.qty_change.abs();
+        const claimedVariant = await tx.productVariants.updateMany({
+          where: {
+            id: parsed.data.variant_id,
+            stock_qty: { gte: outgoingQty },
+          },
+          data: { stock_qty: { decrement: outgoingQty } },
+        });
+        if (claimedVariant.count !== 1) {
+          throw new ActionError(
+            "Stok produk berubah saat penyesuaian. Silakan coba lagi.",
+          );
+        }
+
+        const currentVariant = await tx.productVariants.findUnique({
+          where: { id: parsed.data.variant_id },
+          select: { stock_qty: true },
+        });
+        if (!currentVariant) {
+          throw new ActionError("Varian produk tidak ditemukan.");
+        }
+
+        let balance = currentVariant.stock_qty;
         for (const allocation of plan.allocations) {
-          await tx.stockBatches.update({
-            where: { id: allocation.batch_id },
+          const claimedBatch = await tx.stockBatches.updateMany({
+            where: {
+              id: allocation.batch_id,
+              variant_id: parsed.data.variant_id,
+              remaining_qty: { gte: allocation.allocated_qty },
+            },
             data: { remaining_qty: { decrement: allocation.allocated_qty } },
           });
+          if (claimedBatch.count !== 1) {
+            throw new ActionError(
+              "Stok batch berubah saat penyesuaian. Silakan coba lagi.",
+            );
+          }
+
           balance = balance.minus(allocation.allocated_qty);
           await tx.stockMovements.create({
             data: {
@@ -158,10 +190,6 @@ export async function adjustStockAction(
             },
           });
         }
-        await tx.productVariants.update({
-          where: { id: parsed.data.variant_id },
-          data: { stock_qty: { decrement: plan.qty_change.abs() } },
-        });
       }
 
       await logActivity(

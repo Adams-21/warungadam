@@ -24,7 +24,12 @@ export type DashboardSaleRecord = {
 };
 
 export type DashboardSaleCogsInput = {
-  items: readonly { total_hpp_fifo: bigint | number | string }[];
+  items: readonly {
+    total_hpp_fifo: bigint | number | string;
+    customer_return_items?: readonly {
+      restored_hpp_amount: bigint | number | string;
+    }[];
+  }[];
   packaging_usages: readonly {
     calculated_hpp: bigint | number | string;
     adjusted_hpp?: bigint | number | string | null;
@@ -36,10 +41,13 @@ export function calculateDashboardSaleCogs(input: DashboardSaleCogsInput): {
   packaging_cogs: bigint;
 } {
   return {
-    product_cogs: input.items.reduce(
-      (total, item) => total + toMoney(item.total_hpp_fifo),
-      BigInt(0),
-    ),
+    product_cogs: input.items.reduce((total, item) => {
+      const restoredHpp = (item.customer_return_items ?? []).reduce(
+        (sum, returnItem) => sum + toMoney(returnItem.restored_hpp_amount),
+        BigInt(0),
+      );
+      return total + toMoney(item.total_hpp_fifo) - restoredHpp;
+    }, BigInt(0)),
     packaging_cogs: input.packaging_usages.reduce(
       (total, usage) =>
         total + toMoney(usage.adjusted_hpp ?? usage.calculated_hpp),

@@ -16,10 +16,12 @@ import {
 } from "@/components/ui";
 import { SelectField } from "@/components/select-field";
 import { formatNumber, formatRupiah } from "@/lib/format";
+import { materialOptionLabel } from "@/lib/option-labels";
 import { prisma } from "@/lib/prisma";
 import { StockAdjustmentModal } from "./inventory-manager";
 import { InventoryTabs, type InventoryTab } from "./inventory-tabs";
 import {
+  buildInventoryItemFilter,
   calculateInventoryValuation,
   classifyPackagingMovement,
   classifyStockMovement,
@@ -95,6 +97,10 @@ export default async function InventoryPage({
       : "ALL";
   const itemType = firstValue(params.item_type) === "packaging" ? "packaging" : "product";
   const itemId = (firstValue(params.item_id) ?? "").trim();
+  const itemFilter =
+    itemType === "product"
+      ? buildInventoryItemFilter("product", itemId)
+      : buildInventoryItemFilter("packaging", itemId);
 
   const [variantsRaw, packagingRaw, stockMovementsRaw, packagingMovementsRaw] =
     await Promise.all([
@@ -136,7 +142,7 @@ export default async function InventoryPage({
         ? prisma.stockMovements.findMany({
             where: {
               created_at: { gte: fromDate, lte: toDate },
-              ...(itemId ? { variant_id: itemId } : {}),
+              ...itemFilter,
             },
             orderBy: { created_at: "desc" },
             select: {
@@ -157,7 +163,7 @@ export default async function InventoryPage({
         ? prisma.packagingMovements.findMany({
             where: {
               created_at: { gte: fromDate, lte: toDate },
-              ...(itemId ? { packaging_material_id: itemId } : {}),
+              ...itemFilter,
             },
             orderBy: { created_at: "desc" },
             select: {
@@ -472,7 +478,7 @@ export default async function InventoryPage({
                     ))
                   : packagingViews.map((material) => (
                       <option key={material.id} value={material.id}>
-                        {material.name}
+                        {materialOptionLabel(material.name, material.unit_name)}
                       </option>
                     ))}
               </SelectField>

@@ -7,6 +7,7 @@ import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { parseStrictDateInput } from "@/lib/date-range";
 import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import {
@@ -22,10 +23,28 @@ import {
   calculateSaleItemSubtotal,
   calculateSalePackagingUsage,
   calculateSaleSummary,
+  planSaleVoidPackagingRestorations,
+  planSaleVoidRestorations,
   validateSaleItems,
+  validateSaleVoidEligibility,
+  validateSaleVoidReason,
   type PackageSizeItemInput,
   type PackagingUsageOverride,
 } from "./sales-rules";
+import { resolveDefaultSalesChannel } from "./sales-channel-helpers";
+import { resolvePackageCount } from "./sales-form-helpers";
+import {
+  planSaleVoidPaymentVoids,
+  resolveSalePaymentStatus,
+  salePaymentHistoryReason,
+  saleVoidPaymentHistoryReason,
+  validateSalePaidStatus,
+  validateSaleSettlementStatus,
+} from "./sales-payment-helpers";
+import {
+  SALE_PAYMENT_METHODS,
+  SALE_PAYMENT_STATUS_INPUTS,
+} from "./types";
 
 const moneyInputSchema = z.preprocess(
   (value) => (value === "" || value === null || value === undefined ? "0" : value),
@@ -50,22 +69,41 @@ const packagingUsageSchema = z.object({
 });
 
 const createSaleSchema = z.object({
-  sales_channel_id: uuidSchema,
-  transaction_date: z.date(),
+  sales_channel_id: z.preprocess(
+    (value) => (value === "" || value === null || value === undefined ? null : value),
+    uuidSchema.nullable(),
+  ),
+  transaction_date: z.date("Tanggal transaksi tidak valid."),
   external_order_number: optionalTextSchema,
+  payment_status: z.enum(SALE_PAYMENT_STATUS_INPUTS),
+  payment_method: z.enum(SALE_PAYMENT_METHODS),
   package_size_id: z.preprocess(
     (value) => (value === "" || value === null || value === undefined ? null : value),
     uuidSchema.nullable(),
   ),
   package_count: z.preprocess(
-    (value) => (value === "" || value === null || value === undefined ? 1 : Number(value)),
-    z.number().finite().positive("Jumlah paket harus lebih dari 0."),
+    (value) => resolvePackageCount(value as string | number | null | undefined),
+    z.number().finite("Jumlah paket harus lebih dari 0.").positive("Jumlah paket harus lebih dari 0."),
   ),
   discount_amount: moneyInputSchema,
   additional_fee_amount: moneyInputSchema,
   items: z.array(saleItemSchema).min(1, "Minimal satu item wajib diisi"),
   packaging_overrides: z.array(packagingUsageSchema).default([]),
   extra_materials: z.array(packagingUsageSchema).default([]),
+});
+
+const voidSaleSchema = z.object({
+  id: uuidSchema,
+  reason: z.string().trim().min(1, "Alasan pembatalan wajib diisi.").max(500, "Alasan pembatalan terlalu panjang."),
+});
+
+const markPaidSaleSchema = z.object({
+  id: uuidSchema,
+  payment_method: z.enum(SALE_PAYMENT_METHODS),
+});
+
+const markSettledSaleSchema = z.object({
+  id: uuidSchema,
 });
 
 const REVALIDATE_PATHS = [
@@ -75,12 +113,6 @@ const REVALIDATE_PATHS = [
   "/master/packaging",
   "/master/products",
 ];
-
-function parseDateInput(value: FormDataEntryValue | null): Date | null {
-  if (typeof value !== "string" || value.trim() === "") return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
 
 function readUsageRows(
   formData: FormData,
@@ -111,11 +143,21 @@ export async function createSaleAction(
     const quantities = formData.getAll("qty");
     const unitPrices = formData.getAll("unit_price");
     const itemDiscounts = formData.getAll("item_discount");
+    const rawTransactionDate = formData.get("transaction_date");
+    const transactionDate =
+      typeof rawTransactionDate === "string"
+        ? parseStrictDateInput(rawTransactionDate)
+        : null;
+    if (!transactionDate) {
+      return { error: "Tanggal transaksi tidak valid." };
+    }
 
     const parsed = createSaleSchema.safeParse({
       sales_channel_id: formData.get("sales_channel_id"),
-      transaction_date: parseDateInput(formData.get("transaction_date")),
+      transaction_date: transactionDate,
       external_order_number: formData.get("external_order_number"),
+      payment_status: formData.get("payment_status"),
+      payment_method: formData.get("payment_method"),
       package_size_id: formData.get("package_size_id"),
       package_count: formData.get("package_count"),
       discount_amount: formData.get("discount_amount"),
@@ -146,10 +188,11 @@ export async function createSaleAction(
     const user = await requireAuth();
 
     const created = await prisma.$transaction(async (tx) => {
-      const [channel, settings, variants, packageSize] = await Promise.all([
-        tx.salesChannels.findFirst({
-          where: { id: data.sales_channel_id, is_active: true },
-          select: { id: true, is_marketplace: true },
+      const [activeChannels, settings, variants, packageSize] = await Promise.all([
+        tx.salesChannels.findMany({
+          where: { is_active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, is_marketplace: true },
         }),
         tx.businessSettings.findFirst({
           orderBy: { updated_at: "desc" },
@@ -194,6 +237,9 @@ export async function createSaleAction(
           : Promise.resolve(null),
       ]);
 
+      const channel = data.sales_channel_id
+        ? activeChannels.find((item) => item.id === data.sales_channel_id)
+        : resolveDefaultSalesChannel(activeChannels);
       if (!channel) {
         throw new ActionError("Kanal penjualan tidak ditemukan atau tidak aktif.");
       }
@@ -312,6 +358,7 @@ export async function createSaleAction(
         adminFeeEstimate,
       });
 
+      const paymentStatus = resolveSalePaymentStatus(data.payment_status);
       const settlementStatus = channel.is_marketplace
         ? "Belum_cair"
         : "Tidak_dicairkan";
@@ -331,10 +378,25 @@ export async function createSaleAction(
           admin_fee_estimate_rate: adminFeeRate,
           admin_fee_estimate_amount: adminFeeEstimate,
           order_status: "Selesai",
-          payment_status: "Belum_dibayar",
+          payment_status: paymentStatus,
+          payment_method: data.payment_method,
           settlement_status: settlementStatus,
           is_stock_deducted: true,
           created_by_id: user.id,
+          ...(paymentStatus === "Dibayar"
+            ? {
+                payments: {
+                  create: [
+                    {
+                      payment_date: data.transaction_date,
+                      amount: summary.totalRevenue,
+                      payment_method: data.payment_method,
+                      created_by_id: user.id,
+                    },
+                  ],
+                },
+              }
+            : {}),
           items: {
             create: data.items.map((item, index) => {
               const allocation = allocations[index];
@@ -378,7 +440,8 @@ export async function createSaleAction(
               {
                 status_group: "PAYMENT",
                 old_status: null,
-                new_status: "Belum_dibayar",
+                new_status: paymentStatus,
+                reason: salePaymentHistoryReason(data.payment_method),
                 created_by_id: user.id,
               },
               {
@@ -467,6 +530,394 @@ export async function createSaleAction(
 
     return {
       success: `Transaksi ${created.transaction_number} berhasil dicatat.`,
+    };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
+}
+
+export async function voidSaleAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const parsed = voidSaleSchema.safeParse({
+      id: formData.get("id"),
+      reason: formData.get("reason"),
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const reasonError = validateSaleVoidReason(parsed.data.reason);
+    if (reasonError) return { error: reasonError };
+
+    const user = await requireAuth();
+
+    const voided = await prisma.$transaction(async (tx) => {
+      const sale = await tx.sales.findUnique({
+        where: { id: parsed.data.id },
+        select: {
+          id: true,
+          transaction_number: true,
+          order_status: true,
+          payment_status: true,
+          is_stock_deducted: true,
+          items: {
+            select: {
+              batch_allocations: {
+                select: {
+                  id: true,
+                  batch_id: true,
+                  allocated_qty: true,
+                  reversed_qty: true,
+                  sale_item: { select: { variant_id: true } },
+                },
+              },
+            },
+          },
+          packaging_usages: {
+            select: {
+              id: true,
+              packaging_material_id: true,
+              actual_usage_qty: true,
+              is_stock_deducted: true,
+              is_stock_restored: true,
+            },
+          },
+          customer_returns: {
+            where: { claim_status: { not: "Ditolak" } },
+            select: { id: true },
+          },
+          payments: {
+            where: { is_void: false },
+            select: { id: true },
+          },
+          marketplace_settlements: {
+            where: { is_void: false },
+            select: { id: true },
+          },
+        },
+      });
+
+      if (!sale) {
+        throw new ActionError("Transaksi penjualan tidak ditemukan.");
+      }
+
+      const eligibilityError = validateSaleVoidEligibility({
+        order_status: sale.order_status,
+        is_stock_deducted: sale.is_stock_deducted,
+        has_active_customer_return: sale.customer_returns.length > 0,
+        has_active_settlement: sale.marketplace_settlements.length > 0,
+      });
+      if (eligibilityError) throw new ActionError(eligibilityError);
+
+      const allocations = sale.items.flatMap((item) =>
+        item.batch_allocations.map((allocation) => ({
+          id: allocation.id,
+          variant_id: allocation.sale_item.variant_id,
+          batch_id: allocation.batch_id,
+          allocated_qty: allocation.allocated_qty,
+          reversed_qty: allocation.reversed_qty,
+        })),
+      );
+      const restorations = planSaleVoidRestorations(allocations);
+      const packagingRestorations = planSaleVoidPackagingRestorations(
+        sale.packaging_usages,
+      );
+      const paymentVoids = planSaleVoidPaymentVoids(
+        sale.payments,
+        parsed.data.reason,
+      );
+      const hasPaidStatus =
+        sale.payment_status === "Dibayar" || paymentVoids.length > 0;
+
+      const statusHistory = await tx.saleStatusHistories.create({
+        data: {
+          sale_id: sale.id,
+          status_group: "ORDER",
+          old_status: sale.order_status,
+          new_status: "Dibatalkan",
+          reason: parsed.data.reason,
+          created_by_id: user.id,
+        },
+        select: { id: true },
+      });
+
+      if (hasPaidStatus) {
+        await tx.saleStatusHistories.create({
+          data: {
+            sale_id: sale.id,
+            status_group: "PAYMENT",
+            old_status: sale.payment_status,
+            new_status: "Dikembalikan",
+            reason: saleVoidPaymentHistoryReason(parsed.data.reason),
+            created_by_id: user.id,
+          },
+        });
+        await tx.salePayments.updateMany({
+          where: {
+            id: { in: paymentVoids.map((payment) => payment.id) },
+            is_void: false,
+          },
+          data: {
+            is_void: true,
+            void_reason: saleVoidPaymentHistoryReason(parsed.data.reason),
+            voided_by_id: user.id,
+          },
+        });
+      }
+
+      for (const restoration of restorations) {
+        await tx.saleItemBatchAllocations.update({
+          where: { id: restoration.allocation_id },
+          data: { reversed_qty: { increment: restoration.qty } },
+        });
+        await tx.saleItemBatchAllocationReversals.create({
+          data: {
+            allocation_id: restoration.allocation_id,
+            reversal_type: "CANCELLATION",
+            sale_status_history_id: statusHistory.id,
+            reversed_qty: restoration.qty,
+            created_by_id: user.id,
+          },
+        });
+        await tx.stockBatches.update({
+          where: { id: restoration.batch_id },
+          data: { remaining_qty: { increment: restoration.qty } },
+        });
+        const updatedVariant = await tx.productVariants.update({
+          where: { id: restoration.variant_id },
+          data: { stock_qty: { increment: restoration.qty } },
+          select: { stock_qty: true },
+        });
+        await tx.stockMovements.create({
+          data: {
+            variant_id: restoration.variant_id,
+            batch_id: restoration.batch_id,
+            stock_pool: "SELLABLE",
+            movement_type: "PEMBATALAN_PENJUALAN",
+            qty_change: restoration.qty,
+            balance_after: updatedVariant.stock_qty,
+            reference_type: "Sales",
+            reference_id: sale.id,
+            reference_number: sale.transaction_number,
+            notes: parsed.data.reason,
+            created_by_id: user.id,
+          },
+        });
+      }
+
+      for (const usage of packagingRestorations) {
+        await tx.packagingMaterials.update({
+          where: { id: usage.packaging_material_id },
+          data: { stock_qty: { increment: usage.qty } },
+        });
+        await tx.salePackagingUsages.update({
+          where: { id: usage.id },
+          data: { is_stock_restored: true },
+        });
+        await tx.packagingMovements.create({
+          data: {
+            packaging_material_id: usage.packaging_material_id,
+            movement_type: "PEMBATALAN_PENJUALAN",
+            qty_change: usage.qty,
+            reference_type: "Sales",
+            reference_id: sale.id,
+            reference_number: sale.transaction_number,
+            created_by_id: user.id,
+          },
+        });
+      }
+
+      await tx.sales.update({
+        where: { id: sale.id },
+        data: {
+          order_status: "Dibatalkan",
+          payment_status: hasPaidStatus ? "Dikembalikan" : sale.payment_status,
+          is_stock_deducted: false,
+        },
+      });
+
+      await logActivity(tx, user.id, "Sales", sale.id, "VOID", {
+        transaction_number: sale.transaction_number,
+        reason: parsed.data.reason,
+        restored_allocations: restorations.length,
+        restored_packaging_usages: packagingRestorations.length,
+        voided_payments: paymentVoids.length,
+      });
+
+      return { transaction_number: sale.transaction_number };
+    });
+
+    for (const path of REVALIDATE_PATHS) {
+      revalidatePath(path);
+    }
+    revalidatePath(`/sales/${parsed.data.id}`);
+
+    return {
+      success: `Transaksi ${voided.transaction_number} berhasil dibatalkan dan stok dikembalikan.`,
+    };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
+}
+
+export async function markSalePaidAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const parsed = markPaidSaleSchema.safeParse({
+      id: formData.get("id"),
+      payment_method: formData.get("payment_method"),
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const sale = await tx.sales.findUnique({
+        where: { id: parsed.data.id },
+        select: {
+          id: true,
+          transaction_number: true,
+          total_amount: true,
+          order_status: true,
+          payment_status: true,
+        },
+      });
+
+      if (!sale) {
+        throw new ActionError("Transaksi penjualan tidak ditemukan.");
+      }
+
+      const eligibilityError = validateSalePaidStatus({
+        order_status: sale.order_status,
+        payment_status: sale.payment_status,
+      });
+      if (eligibilityError) throw new ActionError(eligibilityError);
+
+      await tx.sales.update({
+        where: { id: sale.id },
+        data: {
+          payment_status: "Dibayar",
+          payment_method: parsed.data.payment_method,
+        },
+      });
+
+      await tx.salePayments.create({
+        data: {
+          sale_id: sale.id,
+          payment_date: new Date(),
+          amount: sale.total_amount,
+          payment_method: parsed.data.payment_method,
+          created_by_id: user.id,
+        },
+      });
+
+      await tx.saleStatusHistories.create({
+        data: {
+          sale_id: sale.id,
+          status_group: "PAYMENT",
+          old_status: sale.payment_status,
+          new_status: "Dibayar",
+          reason: salePaymentHistoryReason(parsed.data.payment_method),
+          created_by_id: user.id,
+        },
+      });
+
+      await logActivity(tx, user.id, "Sales", sale.id, "MARK_PAID", {
+        transaction_number: sale.transaction_number,
+        payment_method: parsed.data.payment_method,
+        amount: sale.total_amount.toString(),
+      });
+
+      return { transaction_number: sale.transaction_number };
+    });
+
+    for (const path of REVALIDATE_PATHS) {
+      revalidatePath(path);
+    }
+    revalidatePath(`/sales/${parsed.data.id}`);
+
+    return {
+      success: `Transaksi ${updated.transaction_number} ditandai lunas.`,
+    };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
+}
+
+export async function markSaleSettledAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const parsed = markSettledSaleSchema.safeParse({
+      id: formData.get("id"),
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const sale = await tx.sales.findUnique({
+        where: { id: parsed.data.id },
+        select: {
+          id: true,
+          transaction_number: true,
+          order_status: true,
+          settlement_status: true,
+        },
+      });
+
+      if (!sale) {
+        throw new ActionError("Transaksi penjualan tidak ditemukan.");
+      }
+
+      const eligibilityError = validateSaleSettlementStatus({
+        order_status: sale.order_status,
+        settlement_status: sale.settlement_status,
+      });
+      if (eligibilityError) throw new ActionError(eligibilityError);
+
+      await tx.sales.update({
+        where: { id: sale.id },
+        data: { settlement_status: "Sudah_cair" },
+      });
+
+      await tx.saleStatusHistories.create({
+        data: {
+          sale_id: sale.id,
+          status_group: "SETTLEMENT",
+          old_status: sale.settlement_status,
+          new_status: "Sudah_cair",
+          reason: "Dana transaksi dicairkan.",
+          created_by_id: user.id,
+        },
+      });
+
+      await logActivity(tx, user.id, "Sales", sale.id, "MARK_SETTLED", {
+        transaction_number: sale.transaction_number,
+        old_status: sale.settlement_status,
+        new_status: "Sudah_cair",
+      });
+
+      return { transaction_number: sale.transaction_number };
+    });
+
+    for (const path of REVALIDATE_PATHS) {
+      revalidatePath(path);
+    }
+    revalidatePath(`/sales/${parsed.data.id}`);
+
+    return {
+      success: `Dana transaksi ${updated.transaction_number} ditandai sudah dicairkan.`,
     };
   } catch (error) {
     return { error: getErrorMessage(error) };

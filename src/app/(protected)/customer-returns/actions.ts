@@ -20,6 +20,8 @@ import { generateDocumentNumber } from "@/lib/sequence";
 import {
   calculateCustomerReturnRefund,
   planCustomerReturnRestorations,
+  resolveRefundPaidDate,
+  validateCustomerReturnSaleItemVariants,
   type CustomerReturnAllocation,
 } from "./customer-return-rules";
 
@@ -132,7 +134,6 @@ export async function createCustomerReturnAction(
           subtotal_amount: bigint;
         }>,
       };
-      let saleItems: Array<{ id: string }> = [];
 
       if (parsed.data.original_sale_id) {
         const sale = await tx.sales.findUnique({
@@ -144,6 +145,7 @@ export async function createCustomerReturnAction(
             items: {
               select: {
                 id: true,
+                variant_id: true,
                 qty: true,
                 subtotal_amount: true,
                 batch_allocations: {
@@ -170,7 +172,12 @@ export async function createCustomerReturnAction(
           );
         }
 
-        saleItems = sale.items;
+        const variantError = validateCustomerReturnSaleItemVariants(
+          parsed.data.items,
+          sale.items,
+        );
+        if (variantError) throw new ActionError(variantError);
+
         allocations = sale.items.flatMap((item) =>
           item.batch_allocations.map((allocation) => ({
             id: allocation.id,
@@ -192,7 +199,7 @@ export async function createCustomerReturnAction(
         };
 
         for (const item of parsed.data.items) {
-          if (!item.sale_item_id || !saleItems.some((row) => row.id === item.sale_item_id)) {
+          if (!item.sale_item_id) {
             throw new ActionError(
               "Semua barang retur harus berasal dari transaksi yang dipilih.",
             );
@@ -485,14 +492,26 @@ export async function updateCustomerReturnFundStatusAction(
     await prisma.$transaction(async (tx) => {
       const current = await tx.customerReturns.findUnique({
         where: { id: parsed.data.id },
-        select: { id: true, fund_status: true, refund_amount: true },
+        select: {
+          id: true,
+          fund_status: true,
+          refund_amount: true,
+          refund_paid_date: true,
+        },
       });
       if (!current) throw new ActionError("Data retur tidak ditemukan.");
+
+      const effectivePaidDate = resolveRefundPaidDate({
+        nextStatus: parsed.data.status,
+        currentStatus: current.fund_status,
+        currentPaidDate: current.refund_paid_date,
+        submittedDate: paidDate,
+      });
 
       if (
         parsed.data.status === ReturnFundStatus.Dana_dikembalikan &&
         current.refund_amount > BigInt(0) &&
-        !paidDate
+        !effectivePaidDate
       ) {
         throw new ActionError("Tanggal pengembalian dana wajib diisi.");
       }
@@ -501,10 +520,7 @@ export async function updateCustomerReturnFundStatusAction(
         where: { id: parsed.data.id },
         data: {
           fund_status: parsed.data.status,
-          refund_paid_date:
-            parsed.data.status === ReturnFundStatus.Dana_dikembalikan
-              ? paidDate
-              : null,
+          refund_paid_date: effectivePaidDate,
         },
       });
       await tx.customerReturnStatusHistories.create({

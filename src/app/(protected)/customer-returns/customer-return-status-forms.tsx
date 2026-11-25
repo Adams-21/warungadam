@@ -8,6 +8,7 @@ import {
 } from "@/components/ui";
 import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
+import { humanizeStatusLabel } from "@/lib/status-labels";
 import { useActionState } from "react";
 import {
   updateCustomerReturnClaimStatusAction,
@@ -18,12 +19,14 @@ export function CustomerReturnStatusForms({
   id,
   claimStatus,
   fundStatus,
+  refundPaidDate,
   claimStatuses,
   fundStatuses,
 }: {
   id: string;
   claimStatus: string;
   fundStatus: string;
+  refundPaidDate: string | null;
   claimStatuses: string[];
   fundStatuses: string[];
 }) {
@@ -54,7 +57,7 @@ export function CustomerReturnStatusForms({
           >
             {claimStatuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {humanizeStatusLabel(status)}
               </option>
             ))}
           </SelectField>
@@ -90,7 +93,7 @@ export function CustomerReturnStatusForms({
           >
             {fundStatuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {humanizeStatusLabel(status)}
               </option>
             ))}
           </SelectField>
@@ -99,7 +102,13 @@ export function CustomerReturnStatusForms({
           <Label htmlFor="paid_date" className="text-sm font-medium">
             Tanggal Dana Dikembalikan
           </Label>
-          <Input id="paid_date" name="paid_date" type="date" className="mt-1 h-10 bg-white" />
+          <Input
+            id="paid_date"
+            name="paid_date"
+            type="date"
+            defaultValue={refundPaidDate ?? ""}
+            className="mt-1 h-10 bg-white"
+          />
         </div>
         <div>
           <Label htmlFor="fund_notes" className="text-sm font-medium">

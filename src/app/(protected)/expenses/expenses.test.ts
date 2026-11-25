@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveExpenseDateFilter } from "./expense-filter-helpers";
 import {
   aggregateExpenses,
   calculateProfitLoss,
@@ -6,6 +7,7 @@ import {
   validateExpenseInput,
   validateExpenseVoidReason,
 } from "./expense-rules";
+import { calculateExpenseProfit } from "./expense-profit-helpers";
 
 const CATEGORY_IDS = ["listrik", "gaji", "transport"] as const;
 
@@ -205,5 +207,133 @@ describe("Laporan Laba Rugi Ringkas", () => {
         totalOperatingExpenses: BigInt(-1),
       }),
     ).toThrow("Biaya operasional tidak boleh negatif.");
+  });
+});
+
+describe("Filter Tanggal Pengeluaran", () => {
+  const fallback = {
+    from: new Date(2026, 1, 1),
+    to: new Date(2026, 1, 10),
+  };
+
+  it("memakai rentang bawaan saat filter kosong", () => {
+    const result = resolveExpenseDateFilter("", "", fallback);
+    expect(result.error).toBeNull();
+    expect(result.bounds?.gte).toEqual(fallback.from);
+    expect(result.bounds?.lte?.getDate()).toBe(10);
+    expect(result.bounds?.lte?.getHours()).toBe(23);
+  });
+
+  it("menukar rentang yang terbalik", () => {
+    const result = resolveExpenseDateFilter("2026-02-09", "2026-02-02", fallback);
+    expect(result.error).toBeNull();
+    expect(result.bounds?.gte?.getDate()).toBe(2);
+    expect(result.bounds?.lte?.getDate()).toBe(9);
+    expect(result.from.getDate()).toBe(2);
+    expect(result.to.getDate()).toBe(9);
+  });
+
+  it("menolak tanggal invalid", () => {
+    const result = resolveExpenseDateFilter("2026-13-40", "", fallback);
+    expect(result.bounds).toBeNull();
+    expect(result.error).toContain("tidak valid");
+    expect(result.from).toEqual(fallback.from);
+  });
+});
+
+describe("Laba Pengeluaran Sesuai Dashboard", () => {
+  const period = {
+    from: new Date(2026, 1, 1),
+    to: new Date(2026, 1, 28),
+  };
+
+  const sales = [
+    {
+      id: "sale-1",
+      transaction_date: new Date(2026, 1, 3),
+      order_status: "Selesai",
+      total_amount: "100000",
+      admin_fee_estimate_amount: "3000",
+      admin_fee_actual_amount: "5000",
+      items: [{ total_hpp_fifo: "30000" }],
+      packaging_usages: [{ calculated_hpp: "2000", adjusted_hpp: null }],
+    },
+    {
+      id: "sale-2",
+      transaction_date: new Date(2026, 1, 4),
+      order_status: "Selesai",
+      total_amount: "50000",
+      admin_fee_estimate_amount: "2000",
+      admin_fee_actual_amount: null,
+      items: [{ total_hpp_fifo: "15000" }],
+      packaging_usages: [{ calculated_hpp: "1000", adjusted_hpp: null }],
+    },
+    {
+      id: "sale-cancelled",
+      transaction_date: new Date(2026, 1, 5),
+      order_status: "Dibatalkan",
+      total_amount: "999999",
+      admin_fee_estimate_amount: "9000",
+      items: [{ total_hpp_fifo: "900000" }],
+      packaging_usages: [],
+    },
+  ];
+
+  it("menghitung laba dengan komponen dashboard yang sama", () => {
+    const report = calculateExpenseProfit({
+      ...period,
+      sales,
+      refunds: [
+        {
+          refund_paid_date: new Date(2026, 1, 6),
+          refund_amount: "4000",
+          fund_status: "Dana_dikembalikan",
+        },
+        {
+          refund_paid_date: null,
+          refund_amount: "9999",
+          fund_status: "Belum_diproses",
+        },
+      ],
+      expenses: [
+        { expense_date: new Date(2026, 1, 7), amount: "7000", is_void: false },
+        { expense_date: new Date(2026, 1, 8), amount: "10000", is_void: true },
+      ],
+      writeOffs: [
+        { created_at: new Date(2026, 1, 9), loss_value: "3000" },
+        { created_at: new Date(2026, 2, 1), loss_value: "5000" },
+      ],
+    });
+
+    expect(report.totalRevenue).toBe(BigInt(150000));
+    expect(report.productCogs).toBe(BigInt(45000));
+    expect(report.packagingCogs).toBe(BigInt(3000));
+    expect(report.adminFee).toBe(BigInt(7000));
+    expect(report.refunds).toBe(BigInt(4000));
+    expect(report.writeOffLoss).toBe(BigInt(3000));
+    expect(report.totalOperatingExpenses).toBe(BigInt(7000));
+    expect(report.grossProfit).toBe(BigInt(91000));
+    expect(report.netProfit).toBe(BigInt(81000));
+  });
+
+  it("memakai HPP kemasan yang sudah disesuaikan", () => {
+    const report = calculateExpenseProfit({
+      ...period,
+      sales: [
+        {
+          ...sales[0]!,
+          packaging_usages: [
+            { calculated_hpp: "2000", adjusted_hpp: "2500" },
+          ],
+        },
+      ],
+      refunds: [],
+      expenses: [],
+      writeOffs: [],
+    });
+
+    expect(report.packagingCogs).toBe(BigInt(2500));
+    expect(report.grossProfit).toBe(BigInt(62500));
+    expect(report.netProfit).toBe(BigInt(62500));
   });
 });

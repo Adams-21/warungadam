@@ -139,6 +139,7 @@ export function NewPurchaseForm({
             id="due_date"
             name="due_date"
             type="date"
+            required={paymentType === "TEMPO"}
             disabled={paymentType !== "TEMPO"}
             className="mt-1 h-10 bg-white"
           />

@@ -1,7 +1,10 @@
+import { parseStrictDateInput } from "@/lib/date-range";
 import { describe, expect, it } from "vitest";
 import {
   allocateFifoBatches,
+  buildPurchaseListWhere,
   calculateItemSubtotal,
+  calculatePaidAmount,
   calculatePurchaseTotal,
   calculateWeightedAverageUnitCost,
   convertPurchaseToUsageQty,
@@ -9,7 +12,9 @@ import {
   PURCHASE_FULFILLMENT_STATUS,
   resolvePurchaseStatus,
   resolveSupplierPayment,
+  resolveSupplierPaymentTotals,
   SUPPLIER_PAYMENT_STATUS,
+  validatePurchaseDueDate,
   validatePurchaseLines,
   validateReceivedQty,
   validateSupplierPayment,
@@ -64,6 +69,52 @@ describe("Purchase Order (PO)", () => {
     expect(
       resolvePurchaseStatus([{ ordered_qty: 10, received_qty: 12 }]),
     ).toBe(PURCHASE_FULFILLMENT_STATUS.COMPLETED);
+  });
+});
+
+describe("Tanggal dan Filter Pembelian", () => {
+  it("menolak tanggal kalender yang tidak valid", () => {
+    expect(parseStrictDateInput("2026-02-30")).toBeNull();
+    expect(parseStrictDateInput("2026-13-01")).toBeNull();
+    expect(parseStrictDateInput("2026-02-28")?.getDate()).toBe(28);
+  });
+
+  it("mewajibkan due_date hanya untuk pembayaran TEMPO", () => {
+    expect(validatePurchaseDueDate("TEMPO", null)).toContain(
+      "jatuh tempo wajib",
+    );
+    expect(
+      validatePurchaseDueDate("TEMPO", new Date(2026, 2, 1)),
+    ).toBeNull();
+    expect(validatePurchaseDueDate("TUNAI", null)).toBeNull();
+  });
+
+  it("mengabaikan id supplier bukan UUID dan tetap memakai bound tanggal satu sisi", () => {
+    const validSupplierId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+    const filter = {
+      status: "Dikonfirmasi",
+      supplier_id: "bukan-uuid",
+      payment_status: "Sebagian",
+      date_from: "2026-02-01",
+      date_to: "",
+    };
+
+    const where = buildPurchaseListWhere(filter);
+
+    expect(where.supplier_id).toBeUndefined();
+    expect(where.status).toBe("Dikonfirmasi");
+    expect(where.payment_status).toBe("Sebagian");
+    const dateBounds = where.purchase_date as
+      | { gte?: Date; lte?: Date }
+      | undefined;
+    expect(dateBounds?.gte).toEqual(new Date(2026, 1, 1));
+    expect(dateBounds?.lte).toEqual(new Date(2026, 1, 1, 23, 59, 59, 999));
+
+    expect(
+      buildPurchaseListWhere({ ...filter, supplier_id: validSupplierId })
+        .supplier_id,
+    ).toBe(validSupplierId);
+    expect(buildPurchaseListWhere({ ...filter, status: "INVALID" }).status).toBeUndefined();
   });
 });
 
@@ -209,6 +260,41 @@ describe("Supplier Payment", () => {
     expect(second.paid_amount).toBe(BigInt(100000));
     expect(second.remaining_amount).toBe(BigInt(0));
     expect(SUPPLIER_PAYMENT_STATUS.UNPAID).toBe("Belum_dibayar");
+  });
+
+  it("menghitung ulang total dari pembayaran non-void", () => {
+    const paid = calculatePaidAmount([
+      { amount: BigInt(40000) },
+      { amount: BigInt(25000), is_void: true },
+    ]);
+
+    expect(paid).toBe(BigInt(40000));
+    expect(
+      resolveSupplierPaymentTotals(BigInt(100000), paid),
+    ).toEqual({
+      paid_amount: BigInt(40000),
+      remaining_amount: BigInt(60000),
+      payment_status: SUPPLIER_PAYMENT_STATUS.PARTIAL,
+    });
+    expect(
+      resolveSupplierPaymentTotals(
+        BigInt(100000),
+        calculatePaidAmount([{ amount: BigInt(40000), is_void: true }]),
+      ).payment_status,
+    ).toBe(SUPPLIER_PAYMENT_STATUS.UNPAID);
+    expect(
+      resolveSupplierPaymentTotals(BigInt(100000), BigInt(150000)),
+    ).toEqual({
+      paid_amount: BigInt(100000),
+      remaining_amount: BigInt(0),
+      payment_status: SUPPLIER_PAYMENT_STATUS.PAID,
+    });
+    expect(resolveSupplierPaymentTotals(BigInt(100000), null).paid_amount).toBe(
+      BigInt(0),
+    );
+    expect(
+      resolveSupplierPaymentTotals(BigInt(100000), BigInt(-5000)).paid_amount,
+    ).toBe(BigInt(0));
   });
 });
 

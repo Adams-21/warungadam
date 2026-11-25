@@ -7,13 +7,14 @@ import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { parseStrictDateInput } from "@/lib/date-range";
 import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { generateDocumentNumber } from "@/lib/sequence";
 import { optionalTextSchema, priceSchema, uuidSchema } from "@/lib/schemas";
 import {
   resolvePurchaseStatus,
-  resolveSupplierPayment,
+  resolveSupplierPaymentTotals,
   validateReceivedQty,
   validateSupplierPayment,
 } from "../purchase-rules";
@@ -44,10 +45,18 @@ const supplierPaymentSchema = z.object({
     .max(100, "Metode pembayaran terlalu panjang"),
 });
 
-function parseDateInput(value: FormDataEntryValue | null): Date | null {
-  if (typeof value !== "string" || value.trim() === "") return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+const voidSupplierPaymentSchema = z.object({
+  purchase_id: uuidSchema,
+  payment_id: uuidSchema,
+  void_reason: z
+    .string()
+    .trim()
+    .min(1, "Alasan pembatalan wajib diisi")
+    .max(500, "Alasan pembatalan terlalu panjang"),
+});
+
+function parseFormDate(value: FormDataEntryValue | null): Date | null {
+  return typeof value === "string" ? parseStrictDateInput(value) : null;
 }
 
 function revalidatePurchasePaths(purchaseId: string) {
@@ -66,7 +75,7 @@ export async function receiveGoodsAction(
 
     const parsed = receiveGoodsSchema.safeParse({
       purchase_id: formData.get("purchase_id"),
-      received_at: parseDateInput(formData.get("received_at")),
+      received_at: parseFormDate(formData.get("received_at")),
       notes: formData.get("notes"),
       items: itemIds.map((purchaseItemId, index) => ({
         purchase_item_id: purchaseItemId,
@@ -117,6 +126,19 @@ export async function receiveGoodsAction(
         );
       }
 
+      const claimedPurchase = await tx.purchases.updateMany({
+        where: {
+          id: parsed.data.purchase_id,
+          status: { notIn: ["Dibatalkan", "Diterima_seluruhnya"] },
+        },
+        data: { status: "Diterima_sebagian" },
+      });
+      if (claimedPurchase.count !== 1) {
+        throw new ActionError(
+          "Status pesanan berubah. Silakan muat ulang dan coba lagi.",
+        );
+      }
+
       const itemMap = new Map(purchase.items.map((item) => [item.id, item]));
       const receiptNumber = await generateDocumentNumber("RECEIPT", tx);
       const createdReceipt = await tx.goodsReceipts.create({
@@ -144,6 +166,20 @@ export async function receiveGoodsAction(
         );
         if (receiptError) {
           throw new ActionError(receiptError);
+        }
+
+        const claimedItem = await tx.purchaseItems.updateMany({
+          where: {
+            id: purchaseItem.id,
+            purchase_id: parsed.data.purchase_id,
+            received_qty: { lte: purchaseItem.ordered_qty.minus(qty) },
+          },
+          data: { received_qty: { increment: qty } },
+        });
+        if (claimedItem.count !== 1) {
+          throw new ActionError(
+            "Jumlah penerimaan berubah. Silakan muat ulang dan coba lagi.",
+          );
         }
 
         const receiptItem = await tx.goodsReceiptItems.create({
@@ -190,11 +226,6 @@ export async function receiveGoodsAction(
             created_by_id: user.id,
           },
         });
-
-        await tx.purchaseItems.update({
-          where: { id: purchaseItem.id },
-          data: { received_qty: { increment: qty } },
-        });
       }
 
       const allItems = await tx.purchaseItems.findMany({
@@ -203,10 +234,18 @@ export async function receiveGoodsAction(
       });
       const status = resolvePurchaseStatus(allItems);
 
-      await tx.purchases.update({
-        where: { id: parsed.data.purchase_id },
+      const updatedPurchase = await tx.purchases.updateMany({
+        where: {
+          id: parsed.data.purchase_id,
+          status: { notIn: ["Dibatalkan", "Diterima_seluruhnya"] },
+        },
         data: { status },
       });
+      if (updatedPurchase.count !== 1) {
+        throw new ActionError(
+          "Status pesanan berubah. Silakan muat ulang dan coba lagi.",
+        );
+      }
 
       await logActivity(
         tx,
@@ -239,7 +278,7 @@ export async function recordSupplierPaymentAction(
   try {
     const parsed = supplierPaymentSchema.safeParse({
       purchase_id: formData.get("purchase_id"),
-      payment_date: parseDateInput(formData.get("payment_date")),
+      payment_date: parseFormDate(formData.get("payment_date")),
       amount: String(formData.get("amount") ?? ""),
       payment_method: formData.get("payment_method"),
     });
@@ -255,8 +294,10 @@ export async function recordSupplierPaymentAction(
         where: { id: parsed.data.purchase_id },
         select: {
           status: true,
+          total_amount: true,
           paid_amount: true,
           remaining_amount: true,
+          payment_status: true,
         },
       });
 
@@ -267,14 +308,21 @@ export async function recordSupplierPaymentAction(
         throw new ActionError("Pesanan dibatalkan tidak dapat dibayar.");
       }
 
+      const beforePayment = await tx.supplierPayments.aggregate({
+        where: { purchase_id: parsed.data.purchase_id, is_void: false },
+        _sum: { amount: true },
+      });
+      const beforeTotals = resolveSupplierPaymentTotals(
+        purchase.total_amount,
+        beforePayment._sum.amount,
+      );
       const paymentError = validateSupplierPayment(
-        purchase,
+        beforeTotals,
         parsed.data.amount,
       );
       if (paymentError) {
         throw new ActionError(paymentError);
       }
-      const nextPayment = resolveSupplierPayment(purchase, parsed.data.amount);
 
       const created = await tx.supplierPayments.create({
         data: {
@@ -287,14 +335,30 @@ export async function recordSupplierPaymentAction(
         select: { id: true },
       });
 
-      await tx.purchases.update({
-        where: { id: parsed.data.purchase_id },
-        data: {
-          paid_amount: nextPayment.paid_amount,
-          remaining_amount: nextPayment.remaining_amount,
-          payment_status: nextPayment.payment_status,
-        },
+      const afterPayment = await tx.supplierPayments.aggregate({
+        where: { purchase_id: parsed.data.purchase_id, is_void: false },
+        _sum: { amount: true },
       });
+      const afterTotals = resolveSupplierPaymentTotals(
+        purchase.total_amount,
+        afterPayment._sum.amount,
+      );
+
+      const updatedPurchase = await tx.purchases.updateMany({
+        where: {
+          id: parsed.data.purchase_id,
+          status: { not: "Dibatalkan" },
+          paid_amount: purchase.paid_amount,
+          remaining_amount: purchase.remaining_amount,
+          payment_status: purchase.payment_status,
+        },
+        data: afterTotals,
+      });
+      if (updatedPurchase.count !== 1) {
+        throw new ActionError(
+          "Data pembayaran berubah. Silakan muat ulang dan coba lagi.",
+        );
+      }
 
       await logActivity(
         tx,
@@ -316,6 +380,97 @@ export async function recordSupplierPaymentAction(
     return {
       success: `Pembayaran ${payment.id.slice(0, 8)} berhasil dicatat.`,
     };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
+}
+
+export async function voidSupplierPaymentAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const parsed = voidSupplierPaymentSchema.safeParse({
+      purchase_id: formData.get("purchase_id"),
+      payment_id: formData.get("payment_id"),
+      void_reason: formData.get("void_reason"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+    const { purchase_id: purchaseId, payment_id: paymentId } = parsed.data;
+
+    await prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchases.findUnique({
+        where: { id: purchaseId },
+        select: {
+          status: true,
+          total_amount: true,
+          paid_amount: true,
+          remaining_amount: true,
+          payment_status: true,
+        },
+      });
+
+      if (!purchase) {
+        throw new ActionError("Pesanan pembelian tidak ditemukan.");
+      }
+      if (purchase.status === "Dibatalkan") {
+        throw new ActionError(
+          "Pembayaran pesanan dibatalkan tidak dapat diubah.",
+        );
+      }
+
+      const voidedPayment = await tx.supplierPayments.updateMany({
+        where: { id: paymentId, purchase_id: purchaseId, is_void: false },
+        data: {
+          is_void: true,
+          void_reason: parsed.data.void_reason,
+          voided_by_id: user.id,
+        },
+      });
+      if (voidedPayment.count !== 1) {
+        throw new ActionError(
+          "Pembayaran tidak ditemukan atau sudah dibatalkan.",
+        );
+      }
+
+      const remainingPayments = await tx.supplierPayments.aggregate({
+        where: { purchase_id: purchaseId, is_void: false },
+        _sum: { amount: true },
+      });
+      const totals = resolveSupplierPaymentTotals(
+        purchase.total_amount,
+        remainingPayments._sum.amount,
+      );
+
+      const updatedPurchase = await tx.purchases.updateMany({
+        where: {
+          id: purchaseId,
+          status: { not: "Dibatalkan" },
+          paid_amount: purchase.paid_amount,
+          remaining_amount: purchase.remaining_amount,
+          payment_status: purchase.payment_status,
+        },
+        data: totals,
+      });
+      if (updatedPurchase.count !== 1) {
+        throw new ActionError(
+          "Data pembayaran berubah. Silakan muat ulang dan coba lagi.",
+        );
+      }
+
+      await logActivity(tx, user.id, "SupplierPayments", paymentId, "VOID", {
+        purchase_id: purchaseId,
+        void_reason: parsed.data.void_reason,
+      });
+    });
+
+    revalidatePurchasePaths(purchaseId);
+    return { success: "Pembayaran berhasil dibatalkan." };
   } catch (error) {
     return { error: getErrorMessage(error) };
   }

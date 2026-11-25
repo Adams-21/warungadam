@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { Prisma } from "@prisma/client";
 import {
+  Badge,
   Button,
   DateRangeFields,
   EmptyState,
@@ -21,6 +21,8 @@ import {
 import { SelectField } from "@/components/select-field";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { buildSalesWhere } from "./sales-rules";
+import { VoidSaleButton } from "./void-sale-button";
 import {
   SALE_ORDER_STATUSES,
   saleOrderStatusLabel,
@@ -62,21 +64,13 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     ? statusRaw
     : "";
 
-  const where: Prisma.SalesWhereInput = {};
-  if (search) {
-    where.OR = [
-      { transaction_number: { contains: search, mode: "insensitive" } },
-      { external_order_number: { contains: search, mode: "insensitive" } },
-    ];
-  }
-  if (channelRaw) where.sales_channel_id = channelRaw;
-  if (status) where.order_status = status as (typeof SALE_ORDER_STATUSES)[number];
-  if (dateFrom || dateTo) {
-    where.transaction_date = {
-      ...(dateFrom ? { gte: new Date(`${dateFrom}T00:00:00`) } : {}),
-      ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999`) } : {}),
-    };
-  }
+  const where = buildSalesWhere({
+    search,
+    channelId: channelRaw,
+    status,
+    dateFrom,
+    dateTo,
+  });
 
   const [rows, channels] = await Promise.all([
     prisma.sales.findMany({
@@ -93,7 +87,6 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       },
     }),
     prisma.salesChannels.findMany({
-      where: { is_active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -117,7 +110,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         id: sale.id,
         transaction_number: sale.transaction_number,
         transaction_date: sale.transaction_date.toISOString(),
-        channel_name: sale.sales_channel.name,
+        channel_name: sale.sales_channel?.name ?? "-",
         external_order_number: sale.external_order_number ?? "",
         package_size_name: sale.package_size?.name ?? "",
         total_amount: Number(sale.total_amount),
@@ -128,6 +121,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         order_status: sale.order_status,
         payment_status: sale.payment_status,
         settlement_status: sale.settlement_status,
+        is_stock_deducted: sale.is_stock_deducted,
         item_count: sale._count.items,
       };
 
@@ -317,7 +311,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
                     {new Date(sale.transaction_date).toLocaleDateString("id-ID")}
                   </TableCell>
                   <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
-                    {sale.channel_name}
+                    <Badge className="border-teal-200 bg-teal-50 text-teal-700">
+                      {sale.channel_name}
+                    </Badge>
                     {sale.package_size_name ? (
                       <span className="mt-1 block text-xs text-slate-500">
                         Paket {sale.package_size_name}
@@ -350,12 +346,18 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
                     </div>
                   </TableCell>
                   <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
-                    <Link
-                      href={`/sales/${sale.id}`}
-                      className="font-medium text-slate-900 underline"
-                    >
-                      Detail
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/sales/${sale.id}`}
+                        className="font-medium text-slate-900 underline"
+                      >
+                        Detail
+                      </Link>
+                      {sale.order_status === "Selesai" &&
+                      sale.is_stock_deducted ? (
+                        <VoidSaleButton saleId={sale.id} compact />
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

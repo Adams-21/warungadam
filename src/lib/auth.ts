@@ -6,12 +6,15 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import {
+  isSessionExpired,
+  resolveSessionTimeoutMinutes,
+} from "@/app/login/login-rules";
 import { prisma } from "@/lib/prisma";
 
 export const SESSION_COOKIE_NAME = "bizmanage_session";
 
 const PASSWORD_SALT_ROUNDS = 12;
-const DEFAULT_SESSION_TIMEOUT_MINUTES = 60;
 
 export type CurrentUser = {
   id: string;
@@ -49,7 +52,7 @@ async function getActiveSession() {
   });
 
   if (!session) return null;
-  if (session.expires_at.getTime() <= Date.now()) return null;
+  if (isSessionExpired(session.expires_at, new Date())) return null;
   if (!session.user.is_active) return null;
 
   return session;
@@ -61,11 +64,9 @@ export async function createUserSession(userId: string): Promise<void> {
     select: { session_timeout_minutes: true },
   });
 
-  const configuredTimeout = settings?.session_timeout_minutes ?? 0;
-  const timeoutMinutes =
-    configuredTimeout > 0
-      ? configuredTimeout
-      : DEFAULT_SESSION_TIMEOUT_MINUTES;
+  const timeoutMinutes = resolveSessionTimeoutMinutes(
+    settings?.session_timeout_minutes,
+  );
 
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + timeoutMinutes * 60_000);
@@ -138,26 +139,28 @@ export async function destroyUserSession(): Promise<void> {
   const token = await getSessionToken();
   if (!token) return;
 
-  const tokenHash = hashToken(token);
-  const session = await prisma.sessions.findUnique({
-    where: { token_hash: tokenHash },
-    select: { id: true, user_id: true },
-  });
+  try {
+    const tokenHash = hashToken(token);
+    const session = await prisma.sessions.findUnique({
+      where: { token_hash: tokenHash },
+      select: { id: true, user_id: true },
+    });
 
-  if (session) {
-    await prisma.$transaction([
-      prisma.activityLogs.create({
-        data: {
-          entity_type: "Sessions",
-          entity_id: session.id,
-          action: "LOGOUT",
-          created_by_id: session.user_id,
-        },
-      }),
-      prisma.sessions.deleteMany({ where: { token_hash: tokenHash } }),
-    ]);
+    if (session) {
+      await prisma.$transaction([
+        prisma.activityLogs.create({
+          data: {
+            entity_type: "Sessions",
+            entity_id: session.id,
+            action: "LOGOUT",
+            created_by_id: session.user_id,
+          },
+        }),
+        prisma.sessions.deleteMany({ where: { token_hash: tokenHash } }),
+      ]);
+    }
+  } finally {
+    const cookieStore = await cookies();
+    cookieStore.delete(SESSION_COOKIE_NAME);
   }
-
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
 }

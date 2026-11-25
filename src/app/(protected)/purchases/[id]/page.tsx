@@ -26,7 +26,10 @@ import {
   type SupplierPaymentView,
 } from "../types";
 import { ReceiveGoodsForm } from "./receive-goods-form";
-import { SupplierPaymentForm } from "./supplier-payment-form";
+import {
+  SupplierPaymentForm,
+  VoidSupplierPaymentForm,
+} from "./supplier-payment-form";
 
 export const instant = false;
 
@@ -335,7 +338,7 @@ export default async function PurchaseDetailPage({
               {supplierPaymentViews.map((payment) => (
                 <div
                   key={payment.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 p-3"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"
                 >
                   <div>
                     <p className="text-sm font-medium text-slate-900">
@@ -347,6 +350,12 @@ export default async function PurchaseDetailPage({
                       {payment.is_void ? " · Dibatalkan" : ""}
                     </p>
                   </div>
+                  {!payment.is_void ? (
+                    <VoidSupplierPaymentForm
+                      purchaseId={purchase.id}
+                      paymentId={payment.id}
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>

@@ -34,7 +34,7 @@ const navigation = [
       { label: "Produk & Varian", href: "/master/products" },
       { label: "Kemasan & Ukuran Paket", href: "/master/packaging" },
       { label: "Supplier", href: "/master/suppliers" },
-      { label: "Pengaturan Bisnis", href: "/master/settings" },
+      { label: "Pengaturan Bisnis", href: "/settings" },
     ],
   },
 ] as const;

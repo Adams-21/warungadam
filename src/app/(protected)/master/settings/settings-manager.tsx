@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import {
   ActionMessage,
+  Badge,
   Input,
   Label,
   Panel,
@@ -23,6 +24,7 @@ import {
 import { CompactActionForm } from "@/components/compact-action-form";
 import { EMPTY_ACTION_STATE, type ActionState } from "@/lib/action-state";
 import { formatNumber } from "@/lib/format";
+import { isPresetSessionTimeout, sessionTimeoutLabel } from "./settings-helpers";
 import {
   createExpenseCategoryAction,
   createSalesChannelAction,
@@ -67,7 +69,10 @@ function BusinessSettingsForm({
   const [timeout, setTimeout] = useState(
     String(settings.session_timeout_minutes),
   );
-  const hasCustomTimeout = !["15", "30", "60", "120"].includes(timeout);
+  const hasCustomTimeout = !isPresetSessionTimeout(timeout);
+  const timeoutLabel = hasCustomTimeout
+    ? `${sessionTimeoutLabel(timeout)} (saat ini)`
+    : sessionTimeoutLabel(timeout);
 
   return (
     <Panel
@@ -143,7 +148,9 @@ function BusinessSettingsForm({
                 id="settings-timeout"
                 className="mt-1 h-10 w-full bg-white"
               >
-                <SelectValue placeholder="Pilih timeout sesi" />
+                <SelectValue placeholder="Pilih timeout sesi">
+                  {timeoutLabel}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="15">15 Menit</SelectItem>
@@ -151,9 +158,7 @@ function BusinessSettingsForm({
                 <SelectItem value="60">1 Jam</SelectItem>
                 <SelectItem value="120">Maksimal 2 Jam</SelectItem>
                 {hasCustomTimeout ? (
-                  <SelectItem value={timeout}>
-                    {timeout} Menit (saat ini)
-                  </SelectItem>
+                  <SelectItem value={timeout}>{timeoutLabel}</SelectItem>
                 ) : null}
               </SelectContent>
             </Select>
@@ -275,11 +280,22 @@ export function SettingsManager({
                     {channel.is_marketplace ? "Marketplace" : "Toko"}
                   </TableCell>
                   <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
-                    <ToggleForm
-                      action={toggleSalesChannelActiveAction}
-                      id={channel.id}
-                      active={channel.is_active}
-                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        className={
+                          channel.is_active
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-slate-100 text-slate-600"
+                        }
+                      >
+                        {channel.is_active ? "Aktif" : "Nonaktif"}
+                      </Badge>
+                      <ToggleForm
+                        action={toggleSalesChannelActiveAction}
+                        id={channel.id}
+                        active={channel.is_active}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -15,6 +15,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/ui";
+import { toDateInputValue } from "@/lib/date-range";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { uuidSchema } from "@/lib/schemas";
@@ -202,6 +203,9 @@ export default async function CustomerReturnDetailPage({
             id={detail.id}
             claimStatus={detail.claim_status}
             fundStatus={detail.fund_status}
+            refundPaidDate={
+              row.refund_paid_date ? toDateInputValue(row.refund_paid_date) : null
+            }
             claimStatuses={Object.values(ReturnClaimStatus)}
             fundStatuses={Object.values(ReturnFundStatus)}
           />

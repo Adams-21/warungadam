@@ -16,11 +16,15 @@ import {
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { uuidSchema } from "@/lib/schemas";
+import { salePaymentMethodLabel } from "../sales-payment-helpers";
 import { PrintSaleButton } from "../print-button";
+import { SalePaymentPanel } from "../sale-payment-panel";
+import { calculateAllocationSubtotalHpp } from "../sales-rules";
 import {
   saleOrderStatusLabel,
   salePaymentStatusLabel,
   saleSettlementStatusLabel,
+  saleStatusHistoryLabel,
   type SaleDetailView,
 } from "../types";
 
@@ -74,6 +78,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
           select: {
             id: true,
             status_group: true,
+            old_status: true,
             new_status: true,
             reason: true,
             created_at: true,
@@ -103,7 +108,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     id: sale.id,
     transaction_number: sale.transaction_number,
     transaction_date: sale.transaction_date.toISOString(),
-    channel_name: sale.sales_channel.name,
+    channel_name: sale.sales_channel?.name ?? "-",
     external_order_number: sale.external_order_number ?? "",
     package_size_name: sale.package_size
       ? `${sale.package_size.name}${
@@ -125,6 +130,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     admin_fee_estimate_amount: Number(sale.admin_fee_estimate_amount),
     order_status: sale.order_status,
     payment_status: sale.payment_status,
+    payment_method: sale.payment_method,
     settlement_status: sale.settlement_status,
     is_stock_deducted: sale.is_stock_deducted,
     items: sale.items.map((item) => ({
@@ -143,8 +149,13 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
           reversed_qty: allocation.reversed_qty.toNumber(),
           batch_unit_cost: Number(allocation.batch_unit_cost),
           received_at: allocation.batch.received_at.toISOString(),
-          subtotal_hpp: Number(allocation.batch_unit_cost) *
-            allocation.allocated_qty.toNumber(),
+          subtotal_hpp: Number(
+            calculateAllocationSubtotalHpp(
+              allocation.batch_unit_cost,
+              allocation.allocated_qty,
+              allocation.reversed_qty,
+            ),
+          ),
         }))
         .sort(
           (left, right) =>
@@ -166,6 +177,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     status_histories: sale.status_histories.map((history) => ({
       id: history.id,
       status_group: history.status_group,
+      old_status: history.old_status,
       new_status: history.new_status,
       reason: history.reason ?? "",
       created_at: history.created_at.toISOString(),
@@ -255,6 +267,14 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
           </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Metode Pembayaran
+            </dt>
+            <dd className="mt-1 text-sm text-slate-900">
+              {salePaymentMethodLabel(detail.payment_method)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Stok Produk
             </dt>
             <dd className="mt-1">
@@ -296,6 +316,22 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
             Estimasi admin {formatRupiah(detail.admin_fee_estimate_amount)} (
             {formatNumber(detail.admin_fee_estimate_rate, 2)}%)
           </p>
+        </Panel>
+      </div>
+
+      <div className="mt-6">
+        <Panel
+          title="Update Status & Pembayaran"
+          description="Perubahan status dan metode bayar tercatat otomatis pada riwayat transaksi."
+        >
+          <SalePaymentPanel
+            saleId={detail.id}
+            orderStatus={detail.order_status}
+            paymentStatus={detail.payment_status}
+            paymentMethod={detail.payment_method}
+            settlementStatus={detail.settlement_status}
+            isStockDeducted={detail.is_stock_deducted}
+          />
         </Panel>
       </div>
 
@@ -407,7 +443,17 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
                   className="rounded-lg border border-slate-200 p-3"
                 >
                   <p className="text-sm font-medium text-slate-900">
-                    {history.status_group}: {history.new_status}
+                    {history.status_group}:{" "}
+                    {history.old_status
+                      ? `${saleStatusHistoryLabel(
+                          history.status_group,
+                          history.old_status,
+                        )} → `
+                      : ""}
+                    {saleStatusHistoryLabel(
+                      history.status_group,
+                      history.new_status,
+                    )}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {new Date(history.created_at).toLocaleString("id-ID")}

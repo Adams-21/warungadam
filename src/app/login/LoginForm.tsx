@@ -44,7 +44,11 @@ export function LoginForm() {
         />
       </div>
       {state.error ? (
-        <p className="text-sm text-rose-600" role="alert">
+        <p
+          className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"
+          role="alert"
+          aria-live="polite"
+        >
           {state.error}
         </p>
       ) : null}

@@ -18,10 +18,23 @@ export const SALE_SETTLEMENT_STATUSES = [
   "Tidak_dicairkan",
 ] as const;
 
+export const SALE_PAYMENT_STATUS_INPUTS = ["Lunas", "Belum_dibayar"] as const;
+
+export const SALE_PAYMENT_METHODS = [
+  "Tunai",
+  "Transfer Bank (BCA / BRI / Mandiri)",
+  "QRIS",
+  "E-Wallet (GoPay / OVO / DANA)",
+  "Saldo Marketplace",
+] as const;
+
 export type SaleOrderStatusValue = (typeof SALE_ORDER_STATUSES)[number];
 export type SalePaymentStatusValue = (typeof SALE_PAYMENT_STATUSES)[number];
 export type SaleSettlementStatusValue =
   (typeof SALE_SETTLEMENT_STATUSES)[number];
+export type SalePaymentStatusInput =
+  (typeof SALE_PAYMENT_STATUS_INPUTS)[number];
+export type SalePaymentMethodValue = (typeof SALE_PAYMENT_METHODS)[number];
 
 const ORDER_STATUS_LABELS: Record<SaleOrderStatusValue, string> = {
   Baru: "Baru",
@@ -32,7 +45,7 @@ const ORDER_STATUS_LABELS: Record<SaleOrderStatusValue, string> = {
 
 const PAYMENT_STATUS_LABELS: Record<SalePaymentStatusValue, string> = {
   Belum_dibayar: "Belum dibayar",
-  Dibayar: "Dibayar",
+  Dibayar: "Lunas",
   Dikembalikan: "Dikembalikan",
 };
 
@@ -53,6 +66,13 @@ export function salePaymentStatusLabel(value: string): string {
 
 export function saleSettlementStatusLabel(value: string): string {
   return SETTLEMENT_STATUS_LABELS[value as SaleSettlementStatusValue] ?? value;
+}
+
+export function saleStatusHistoryLabel(group: string, status: string): string {
+  if (group === "ORDER") return saleOrderStatusLabel(status);
+  if (group === "PAYMENT") return salePaymentStatusLabel(status);
+  if (group === "SETTLEMENT") return saleSettlementStatusLabel(status);
+  return status;
 }
 
 export type SaleChannelOptionView = {
@@ -107,6 +127,7 @@ export type SaleListItemView = {
   order_status: string;
   payment_status: string;
   settlement_status: string;
+  is_stock_deducted: boolean;
   item_count: number;
 };
 
@@ -146,6 +167,7 @@ export type SalePackagingUsageView = {
 export type SaleStatusHistoryView = {
   id: string;
   status_group: string;
+  old_status: string | null;
   new_status: string;
   reason: string;
   created_at: string;
@@ -171,6 +193,7 @@ export type SaleDetailView = {
   admin_fee_estimate_amount: number;
   order_status: string;
   payment_status: string;
+  payment_method: string | null;
   settlement_status: string;
   is_stock_deducted: boolean;
   items: SaleItemView[];

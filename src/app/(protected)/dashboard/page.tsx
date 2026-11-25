@@ -90,7 +90,14 @@ export default async function DashboardPage({
           total_amount: true,
           admin_fee_estimate_amount: true,
           admin_fee_actual_amount: true,
-          items: { select: { total_hpp_fifo: true } },
+          items: {
+            select: {
+              total_hpp_fifo: true,
+              customer_return_items: {
+                select: { restored_hpp_amount: true },
+              },
+            },
+          },
           packaging_usages: {
             select: { calculated_hpp: true, adjusted_hpp: true },
           },
@@ -156,7 +163,7 @@ export default async function DashboardPage({
     ]);
 
   const dashboard = aggregateDashboard({
-    period: { from: fromStart, to: toNextDay, asOf: today },
+    period: { from: fromStart, to, asOf: today },
     sales: sales.map((sale) => {
       const cogs = calculateDashboardSaleCogs(sale);
       return {

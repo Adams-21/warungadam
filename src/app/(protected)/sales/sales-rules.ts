@@ -1,4 +1,6 @@
 import { Prisma } from "@prisma/client";
+import { buildDateBounds } from "@/lib/date-range";
+import { uuidSchema } from "@/lib/schemas";
 import {
   allocateFifoBatches,
   calculateItemSubtotal,
@@ -8,6 +10,7 @@ import {
   type FifoAllocationResult,
   type FifoBatch,
 } from "../purchases/purchase-rules";
+import { SALE_ORDER_STATUSES } from "./types";
 
 function toDecimal(value: DecimalInput): Prisma.Decimal {
   return value instanceof Prisma.Decimal
@@ -201,8 +204,7 @@ export function calculateSalePackagingUsage(
     const current = required.get(item.packaging_material_id);
     required.set(item.packaging_material_id, {
       standard_usage_qty: current?.standard_usage_qty ?? new Prisma.Decimal(0),
-      actual_usage_qty:
-        current?.actual_usage_qty ?? new Prisma.Decimal(0).plus(qty),
+      actual_usage_qty: (current?.actual_usage_qty ?? new Prisma.Decimal(0)).plus(qty),
     });
   }
 
@@ -335,4 +337,153 @@ export function calculateSaleSummary(input: SaleSummaryInput): SaleSummary {
     netRevenue,
     netGrossProfit: netRevenue - totalCogs,
   };
+}
+
+export type SalesFilterInput = {
+  search?: string;
+  channelId?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export function buildSalesWhere(input: SalesFilterInput): Prisma.SalesWhereInput {
+  const where: Prisma.SalesWhereInput = {};
+  const search = (input.search ?? "").trim();
+  if (search) {
+    where.OR = [
+      { transaction_number: { contains: search, mode: "insensitive" } },
+      { external_order_number: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const channelId = (input.channelId ?? "").trim();
+  if (channelId && uuidSchema.safeParse(channelId).success) {
+    where.sales_channel_id = channelId;
+  }
+
+  const status = (input.status ?? "").trim();
+  if (
+    SALE_ORDER_STATUSES.includes(status as (typeof SALE_ORDER_STATUSES)[number])
+  ) {
+    where.order_status = status as (typeof SALE_ORDER_STATUSES)[number];
+  }
+
+  const dateBounds = buildDateBounds(input.dateFrom ?? "", input.dateTo ?? "");
+  if (dateBounds) where.transaction_date = dateBounds;
+
+  return where;
+}
+
+export function calculateAllocationSubtotalHpp(
+  batchUnitCost: bigint | number | string,
+  allocatedQty: DecimalInput,
+  reversedQty: DecimalInput,
+): bigint {
+  const allocated = toDecimal(allocatedQty);
+  const reversed = toDecimal(reversedQty);
+  const netQty = allocated.minus(reversed);
+  if (netQty.lte(0)) return BigInt(0);
+
+  const unitCost = toMoney(batchUnitCost.toString());
+  return roundToBigInt(toDecimal(unitCost.toString()).mul(netQty));
+}
+
+export function validateSaleVoidReason(
+  reason: string | null | undefined,
+): string | null {
+  const trimmed = (reason ?? "").trim();
+  if (!trimmed) return "Alasan pembatalan wajib diisi.";
+  if (trimmed.length > 500) return "Alasan pembatalan terlalu panjang.";
+  return null;
+}
+
+export type SaleVoidEligibilityInput = {
+  order_status: string;
+  is_stock_deducted: boolean;
+  has_active_customer_return: boolean;
+  has_active_settlement: boolean;
+};
+
+export function validateSaleVoidEligibility(
+  input: SaleVoidEligibilityInput,
+): string | null {
+  if (input.order_status === "Dibatalkan") {
+    return "Transaksi ini sudah dibatalkan.";
+  }
+  if (input.order_status !== "Selesai") {
+    return "Hanya transaksi selesai yang dapat dibatalkan.";
+  }
+  if (!input.is_stock_deducted) {
+    return "Stok transaksi ini tidak dipotong.";
+  }
+  if (input.has_active_customer_return) {
+    return "Transaksi memiliki retur aktif dan tidak dapat dibatalkan.";
+  }
+  if (input.has_active_settlement) {
+    return "Transaksi memiliki settlement aktif dan tidak dapat dibatalkan.";
+  }
+  return null;
+}
+
+export type SaleVoidAllocation = {
+  id: string;
+  variant_id: string;
+  batch_id: string;
+  allocated_qty: DecimalInput;
+  reversed_qty: DecimalInput;
+};
+
+export type SaleVoidRestoration = {
+  allocation_id: string;
+  variant_id: string;
+  batch_id: string;
+  qty: Prisma.Decimal;
+};
+
+export function planSaleVoidRestorations(
+  allocations: readonly SaleVoidAllocation[],
+): SaleVoidRestoration[] {
+  return allocations.flatMap((allocation) => {
+    const qty = toDecimal(allocation.allocated_qty).minus(
+      toDecimal(allocation.reversed_qty),
+    );
+    if (qty.lte(0)) return [];
+
+    return [
+      {
+        allocation_id: allocation.id,
+        variant_id: allocation.variant_id,
+        batch_id: allocation.batch_id,
+        qty,
+      },
+    ];
+  });
+}
+
+export type SaleVoidPackagingUsage = {
+  id: string;
+  packaging_material_id: string;
+  actual_usage_qty: DecimalInput;
+  is_stock_deducted: boolean;
+  is_stock_restored: boolean;
+};
+
+export function planSaleVoidPackagingRestorations(
+  usages: readonly SaleVoidPackagingUsage[],
+): Array<{ id: string; packaging_material_id: string; qty: Prisma.Decimal }> {
+  return usages.flatMap((usage) => {
+    const qty = toDecimal(usage.actual_usage_qty);
+    if (!usage.is_stock_deducted || usage.is_stock_restored || qty.lte(0)) {
+      return [];
+    }
+
+    return [
+      {
+        id: usage.id,
+        packaging_material_id: usage.packaging_material_id,
+        qty,
+      },
+    ];
+  });
 }

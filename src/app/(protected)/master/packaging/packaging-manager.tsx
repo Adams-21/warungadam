@@ -19,6 +19,7 @@ import { CompactActionForm } from "@/components/compact-action-form";
 import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE, type ActionState } from "@/lib/action-state";
 import { formatNumber, formatRupiah } from "@/lib/format";
+import { materialOptionLabel } from "@/lib/option-labels";
 import {
   createMaterialAction,
   createPackageSizeAction,
@@ -312,7 +313,7 @@ function PackageItemForm({
             </option>
             {materials.map((material) => (
               <option key={material.id} value={material.id}>
-                {material.name}
+                {materialOptionLabel(material.name, material.usage_unit_name)}
               </option>
             ))}
           </SelectField>

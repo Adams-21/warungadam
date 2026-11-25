@@ -9,7 +9,7 @@ export function toDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function parseDateInput(value: string): Date | null {
+export function parseStrictDateInput(value: string): Date | null {
   if (!DATE_ONLY_PATTERN.test(value)) return null;
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(year, month - 1, day);
@@ -52,25 +52,34 @@ export function resolveDateRangePreset(
 export function buildDateBounds(
   fromValue: string,
   toValue: string,
-): { gte: Date; lte: Date } | null {
-  const from = parseDateInput(fromValue);
-  const to = parseDateInput(toValue);
-  if (!from || !to) return null;
+): { gte?: Date; lte?: Date } | null {
+  const from = fromValue ? parseStrictDateInput(fromValue) : null;
+  const to = toValue ? parseStrictDateInput(toValue) : null;
+  if (fromValue && !from) return null;
+  if (toValue && !to) return null;
+  if (!from && !to) return null;
 
-  const start =
-    from <= to ? from : to;
-  const end = from <= to ? to : from;
+  const start = from && to ? (from <= to ? from : to) : from ?? to;
+  const end = from && to ? (from <= to ? to : from) : from ?? to;
+
+  if (!start || !end) return null;
 
   return {
-    gte: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
-    lte: new Date(
-      end.getFullYear(),
-      end.getMonth(),
-      end.getDate(),
-      23,
-      59,
-      59,
-      999,
-    ),
+    ...(start
+      ? { gte: new Date(start.getFullYear(), start.getMonth(), start.getDate()) }
+      : {}),
+    ...(end
+      ? {
+          lte: new Date(
+            end.getFullYear(),
+            end.getMonth(),
+            end.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ),
+        }
+      : {}),
   };
 }

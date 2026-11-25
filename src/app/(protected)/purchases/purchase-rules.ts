@@ -1,4 +1,12 @@
 import { Prisma } from "@prisma/client";
+import { buildDateBounds } from "@/lib/date-range";
+import { uuidSchema } from "@/lib/schemas";
+import {
+  PAYMENT_STATUSES,
+  PURCHASE_STATUSES,
+  type PaymentStatusValue,
+  type PurchaseStatusValue,
+} from "./types";
 
 export type DecimalInput = Prisma.Decimal | number | string | bigint;
 
@@ -26,6 +34,53 @@ export function toMoney(value: bigint | number | string): bigint {
     throw new Error("Nominal harus berupa bilangan bulat.");
   }
   return BigInt(trimmed);
+}
+
+export function validatePurchaseDueDate(
+  paymentType: string,
+  dueDate: Date | null,
+): string | null {
+  if (paymentType === "TEMPO" && !dueDate) {
+    return "Tanggal jatuh tempo wajib diisi untuk pembayaran tempo.";
+  }
+  return null;
+}
+
+export type PurchaseListFilter = {
+  status: string;
+  supplier_id: string;
+  payment_status: string;
+  date_from: string;
+  date_to: string;
+};
+
+export function buildPurchaseListWhere(
+  filter: PurchaseListFilter,
+): Prisma.PurchasesWhereInput {
+  const where: Prisma.PurchasesWhereInput = {};
+
+  if (PURCHASE_STATUSES.some((value) => value === filter.status)) {
+    where.status = filter.status as PurchaseStatusValue;
+  }
+
+  const supplierId = filter.supplier_id.trim();
+  if (supplierId && uuidSchema.safeParse(supplierId).success) {
+    where.supplier_id = supplierId;
+  }
+
+  if (PAYMENT_STATUSES.some((value) => value === filter.payment_status)) {
+    where.payment_status = filter.payment_status as PaymentStatusValue;
+  }
+
+  const dateBounds = buildDateBounds(
+    filter.date_from.trim(),
+    filter.date_to.trim(),
+  );
+  if (dateBounds) {
+    where.purchase_date = dateBounds;
+  }
+
+  return where;
 }
 
 export type PurchaseLine = {
@@ -258,6 +313,45 @@ export function resolveSupplierPayment(
       remainingAmount === BigInt(0)
         ? SUPPLIER_PAYMENT_STATUS.PAID
         : SUPPLIER_PAYMENT_STATUS.PARTIAL,
+  };
+}
+
+export type SupplierPaymentAmount = {
+  amount: DecimalInput;
+  is_void?: boolean;
+};
+
+export function calculatePaidAmount(
+  payments: readonly SupplierPaymentAmount[],
+): bigint {
+  return payments.reduce((sum, payment) => {
+    if (payment.is_void) return sum;
+    return sum + toMoney(payment.amount.toString());
+  }, BigInt(0));
+}
+
+export function resolveSupplierPaymentTotals(
+  totalAmount: bigint,
+  paidAmount: bigint | null,
+): SupplierPaymentResult {
+  const rawPaid = paidAmount ?? BigInt(0);
+  const paid =
+    rawPaid < BigInt(0)
+      ? BigInt(0)
+      : rawPaid > totalAmount
+        ? totalAmount
+        : rawPaid;
+  const remainingAmount = totalAmount - paid;
+
+  return {
+    paid_amount: paid,
+    remaining_amount: remainingAmount,
+    payment_status:
+      remainingAmount === BigInt(0)
+        ? SUPPLIER_PAYMENT_STATUS.PAID
+        : paid === BigInt(0)
+          ? SUPPLIER_PAYMENT_STATUS.UNPAID
+          : SUPPLIER_PAYMENT_STATUS.PARTIAL,
   };
 }
 

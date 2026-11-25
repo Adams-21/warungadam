@@ -18,6 +18,7 @@ import {
 import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import { formatNumber, formatRupiah } from "@/lib/format";
+import { materialOptionLabel } from "@/lib/option-labels";
 import { createPackagingPurchaseAction } from "./actions";
 import type { PackagingMaterialOptionView } from "../types";
 
@@ -151,7 +152,7 @@ export function PackagingPurchaseForm({
                       </option>
                       {materials.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.name}
+                          {materialOptionLabel(item.name, item.purchase_unit_name)}
                         </option>
                       ))}
                     </SelectField>

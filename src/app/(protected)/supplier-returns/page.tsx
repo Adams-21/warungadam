@@ -20,16 +20,18 @@ import {
 import { SelectField } from "@/components/select-field";
 import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
+import { humanizeStatusLabel } from "@/lib/status-labels";
 import { prisma } from "@/lib/prisma";
+import { firstValue } from "./supplier-return-rules";
 import type { SupplierReturnListItemView } from "./types";
 
 export const instant = false;
 
 type SearchParams = Promise<{
-  q?: string;
-  resolution_type?: string;
-  date_from?: string;
-  date_to?: string;
+  q?: string | string[];
+  resolution_type?: string | string[];
+  date_from?: string | string[];
+  date_to?: string | string[];
 }>;
 
 export default async function SupplierReturnsPage({
@@ -38,13 +40,15 @@ export default async function SupplierReturnsPage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
-  const query = params.q?.trim() ?? "";
-  const dateFrom = params.date_from ?? "";
-  const dateTo = params.date_to ?? "";
-  const resolution = Object.values(SupplierReturnResolution).includes(
-    params.resolution_type as SupplierReturnResolution,
-  )
-    ? (params.resolution_type as SupplierReturnResolution)
+  const query = firstValue(params.q)?.trim() ?? "";
+  const dateFrom = firstValue(params.date_from) ?? "";
+  const dateTo = firstValue(params.date_to) ?? "";
+  const resolutionRaw = firstValue(params.resolution_type);
+  const resolution = resolutionRaw &&
+    Object.values(SupplierReturnResolution).includes(
+      resolutionRaw as SupplierReturnResolution,
+    )
+    ? (resolutionRaw as SupplierReturnResolution)
     : undefined;
 
   const where: {
@@ -147,7 +151,7 @@ export default async function SupplierReturnsPage({
               <option value="">Semua</option>
               {Object.values(SupplierReturnResolution).map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {humanizeStatusLabel(item)}
                 </option>
               ))}
             </SelectField>

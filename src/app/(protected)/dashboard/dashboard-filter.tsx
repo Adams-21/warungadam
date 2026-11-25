@@ -43,7 +43,9 @@ export function DashboardFilter({
           onValueChange={(value) => setView(value === "monthly" ? "monthly" : "daily")}
         >
           <SelectTrigger id="granularity" className="mt-1 h-10 w-full bg-white">
-            <SelectValue placeholder="Pilih tampilan" />
+            <SelectValue placeholder="Pilih tampilan">
+              {view === "monthly" ? "Bulanan" : "Harian"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="daily">Harian</SelectItem>

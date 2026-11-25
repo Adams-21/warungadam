@@ -325,7 +325,7 @@ export default async function DashboardPage({
             </Link>
           </div>
 
-          <h3 className="text-sm font-semibold text-zinc-800">Produk</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Produk</h3>
           {dashboard.low_stock_products.length === 0 ? (
             <div className="mt-2">
               <EmptyState
@@ -342,14 +342,14 @@ export default async function DashboardPage({
                   className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2"
                 >
                   <div>
-                    <p className="text-sm font-medium text-zinc-900">{item.label}</p>
+                    <p className="text-sm font-medium text-slate-900">{item.label}</p>
                     <p className="text-xs text-amber-700">
                       Stok {formatNumber(item.stock_qty)} · Min. {formatNumber(item.min_stock)}
                     </p>
                   </div>
                   <Link
                     href="/purchases/new"
-                    className="shrink-0 text-xs font-medium text-zinc-900 underline"
+                    className="shrink-0 text-xs font-medium text-slate-900 underline"
                   >
                     Pesan
                   </Link>
@@ -358,7 +358,7 @@ export default async function DashboardPage({
             </ul>
           )}
 
-          <h3 className="mt-5 text-sm font-semibold text-zinc-800">Kemasan</h3>
+          <h3 className="mt-5 text-sm font-semibold text-slate-800">Kemasan</h3>
           {dashboard.low_stock_packaging.length === 0 ? (
             <div className="mt-2">
               <EmptyState
@@ -375,14 +375,14 @@ export default async function DashboardPage({
                   className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2"
                 >
                   <div>
-                    <p className="text-sm font-medium text-zinc-900">{item.label}</p>
+                    <p className="text-sm font-medium text-slate-900">{item.label}</p>
                     <p className="text-xs text-amber-700">
                       Stok {formatNumber(item.stock_qty)} · Min. {formatNumber(item.min_stock)}
                     </p>
                   </div>
                   <Link
                     href="/purchases/new"
-                    className="shrink-0 text-xs font-medium text-zinc-900 underline"
+                    className="shrink-0 text-xs font-medium text-slate-900 underline"
                   >
                     Pesan
                   </Link>
@@ -407,14 +407,14 @@ export default async function DashboardPage({
               {dashboard.unpaid_bills.map((bill) => (
                 <li
                   key={bill.id}
-                  className="rounded-md border border-zinc-200 p-3"
+                  className="rounded-md border border-slate-200 p-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-zinc-900">
+                      <p className="text-sm font-medium text-slate-900">
                         {bill.purchase_number}
                       </p>
-                      <p className="text-xs text-zinc-500">{bill.supplier_name}</p>
+                      <p className="text-xs text-slate-500">{bill.supplier_name}</p>
                     </div>
                     <StatusBadge
                       status={bill.is_overdue ? "Jatuh tempo" : "Belum lunas"}
@@ -422,17 +422,17 @@ export default async function DashboardPage({
                     />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-zinc-900">
+                    <p className="text-sm font-semibold text-slate-900">
                       {formatRupiah(Number(bill.remaining_amount))}
                     </p>
                     <Link
                       href={`/purchases/${bill.id}`}
-                      className="text-xs font-medium text-zinc-900 underline"
+                      className="text-xs font-medium text-slate-900 underline"
                     >
                       Lihat PO
                     </Link>
                   </div>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     Jatuh tempo {bill.due_date ?? "tidak ditentukan"}
                   </p>
                 </li>
@@ -457,28 +457,28 @@ export default async function DashboardPage({
               }
             />
           ) : (
-            <ul className="divide-y divide-zinc-100">
+            <ul className="divide-y divide-slate-100">
               {dashboard.recent_sales.map((sale) => (
                 <li
                   key={sale.id}
                   className="flex flex-wrap items-center justify-between gap-3 py-2"
                 >
                   <div>
-                    <p className="text-sm font-medium text-zinc-900">
+                    <p className="text-sm font-medium text-slate-900">
                       {sale.transaction_number}
                     </p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-slate-500">
                       {new Date(sale.transaction_date).toLocaleString("id-ID")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={sale.order_status} />
-                    <p className="text-sm font-semibold text-zinc-900">
+                    <p className="text-sm font-semibold text-slate-900">
                       {formatRupiah(Number(sale.total_amount))}
                     </p>
                     <Link
                       href={`/sales/${sale.id}`}
-                      className="text-xs font-medium text-zinc-900 underline"
+                      className="text-xs font-medium text-slate-900 underline"
                     >
                       Detail
                     </Link>
@@ -492,22 +492,22 @@ export default async function DashboardPage({
         <Panel title="Informasi Bisnis & Sesi Aktif">
           <dl className="space-y-3 text-sm">
             <div>
-              <dt className="text-zinc-500">Nama bisnis</dt>
-              <dd className="font-medium text-zinc-900">
+              <dt className="text-slate-500">Nama bisnis</dt>
+              <dd className="font-medium text-slate-900">
                 {settings?.business_name ?? "BizManage"}
               </dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Alamat</dt>
-              <dd className="text-zinc-900">{settings?.address ?? "-"}</dd>
+              <dt className="text-slate-500">Alamat</dt>
+              <dd className="text-slate-900">{settings?.address ?? "-"}</dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Telepon</dt>
-              <dd className="text-zinc-900">{settings?.phone ?? "-"}</dd>
+              <dt className="text-slate-500">Telepon</dt>
+              <dd className="text-slate-900">{settings?.phone ?? "-"}</dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Pengguna aktif</dt>
-              <dd className="text-zinc-900">
+              <dt className="text-slate-500">Pengguna aktif</dt>
+              <dd className="text-slate-900">
                 {user.username} · {user.role}
               </dd>
             </div>

@@ -3,10 +3,11 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { generateDocumentNumber } from "@/lib/sequence";
 import { optionalTextSchema, priceSchema, uuidSchema } from "@/lib/schemas";
@@ -59,34 +60,34 @@ export async function receiveGoodsAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const itemIds = formData.getAll("purchase_item_id");
-  const receivedQtys = formData.getAll("received_qty");
-
-  const parsed = receiveGoodsSchema.safeParse({
-    purchase_id: formData.get("purchase_id"),
-    received_at: parseDateInput(formData.get("received_at")),
-    notes: formData.get("notes"),
-    items: itemIds.map((purchaseItemId, index) => ({
-      purchase_item_id: purchaseItemId,
-      received_qty: receivedQtys[index],
-    })),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const rows = parsed.data.items.filter((item) => item.received_qty > 0);
-  if (rows.length === 0) {
-    return { error: "Minimal satu jumlah penerimaan harus lebih dari 0." };
-  }
-  if (new Set(rows.map((item) => item.purchase_item_id)).size !== rows.length) {
-    return { error: "Item penerimaan tidak boleh duplikat." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const itemIds = formData.getAll("purchase_item_id");
+    const receivedQtys = formData.getAll("received_qty");
+
+    const parsed = receiveGoodsSchema.safeParse({
+      purchase_id: formData.get("purchase_id"),
+      received_at: parseDateInput(formData.get("received_at")),
+      notes: formData.get("notes"),
+      items: itemIds.map((purchaseItemId, index) => ({
+        purchase_item_id: purchaseItemId,
+        received_qty: receivedQtys[index],
+      })),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const rows = parsed.data.items.filter((item) => item.received_qty > 0);
+    if (rows.length === 0) {
+      return { error: "Minimal satu jumlah penerimaan harus lebih dari 0." };
+    }
+    if (new Set(rows.map((item) => item.purchase_item_id)).size !== rows.length) {
+      return { error: "Item penerimaan tidak boleh duplikat." };
+    }
+
+    const user = await requireAuth();
+
     const receipt = await prisma.$transaction(async (tx) => {
       const purchase = await tx.purchases.findUnique({
         where: { id: parsed.data.purchase_id },
@@ -227,7 +228,7 @@ export async function receiveGoodsAction(
       success: `Penerimaan ${receipt.receipt_number} berhasil dicatat.`,
     };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan penerimaan barang.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -235,20 +236,20 @@ export async function recordSupplierPaymentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = supplierPaymentSchema.safeParse({
-    purchase_id: formData.get("purchase_id"),
-    payment_date: parseDateInput(formData.get("payment_date")),
-    amount: String(formData.get("amount") ?? ""),
-    payment_method: formData.get("payment_method"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = supplierPaymentSchema.safeParse({
+      purchase_id: formData.get("purchase_id"),
+      payment_date: parseDateInput(formData.get("payment_date")),
+      amount: String(formData.get("amount") ?? ""),
+      payment_method: formData.get("payment_method"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const payment = await prisma.$transaction(async (tx) => {
       const purchase = await tx.purchases.findUnique({
         where: { id: parsed.data.purchase_id },
@@ -316,6 +317,6 @@ export async function recordSupplierPaymentAction(
       success: `Pembayaran ${payment.id.slice(0, 8)} berhasil dicatat.`,
     };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan pembayaran supplier.");
+    return { error: getErrorMessage(error) };
   }
 }

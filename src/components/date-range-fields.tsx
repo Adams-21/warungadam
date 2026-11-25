@@ -1,17 +1,12 @@
 "use client";
 
+import { Button, Input, Label, secondaryButtonClass } from "@/components/ui";
 import {
   resolveDateRangePreset,
   toDateInputValue,
   type DateRangePreset,
 } from "@/lib/date-range";
 import { useRef } from "react";
-
-const inputClass =
-  "mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900";
-
-const presetButtonClass =
-  "rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 sm:px-3 sm:text-sm";
 
 const presets: { label: string; preset: DateRangePreset }[] = [
   { label: "Hari Ini", preset: "today" },
@@ -24,8 +19,8 @@ export function DateRangeFields({
   to,
   fromName = "date_from",
   toName = "date_to",
-  fromLabel = "Dari Tanggal",
-  toLabel = "Sampai Tanggal",
+  fromLabel = "Dari",
+  toLabel = "Sampai",
   showPresets = true,
   className = "",
 }: {
@@ -54,43 +49,44 @@ export function DateRangeFields({
     <div ref={wrapperRef} className={`space-y-3 ${className}`}>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor={fromName} className="text-sm font-medium">
+          <Label htmlFor={fromName} className="text-sm font-medium text-slate-700">
             {fromLabel}
-          </label>
-          <input
+          </Label>
+          <Input
             id={fromName}
             name={fromName}
             type="date"
             defaultValue={from}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div>
-          <label htmlFor={toName} className="text-sm font-medium">
+          <Label htmlFor={toName} className="text-sm font-medium text-slate-700">
             {toLabel}
-          </label>
-          <input
+          </Label>
+          <Input
             id={toName}
             name={toName}
             type="date"
             defaultValue={to}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
       </div>
       {showPresets ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {presets.map((item) => (
-            <button
+            <Button
               key={item.preset}
               type="button"
+              variant="outline"
               onClick={() => applyPreset(item.preset)}
-              className={presetButtonClass}
+              className={`${secondaryButtonClass} h-9 text-xs sm:text-sm`}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
-          <span className="self-center text-xs text-zinc-500">
+          <span className="self-center text-xs text-slate-500">
             Pintasan: {toDateInputValue(new Date())}
           </span>
         </div>

@@ -2,11 +2,21 @@
 
 import {
   ActionMessage,
+  Button,
+  Input,
+  Label,
   SubmitButton,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
+import { CompactActionForm } from "@/components/compact-action-form";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import { useActionState, useState, type ReactNode } from "react";
 import {
@@ -36,27 +46,27 @@ function ModalFrame({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <button
+      <Button
         type="button"
         aria-label="Tutup"
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-zinc-900/40"
+        className="absolute inset-0 cursor-default bg-slate-900/40"
       />
       <aside className="relative z-10 h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-zinc-900">{title}</h3>
+            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
             {description ? (
-              <p className="mt-1 text-sm text-zinc-600">{description}</p>
+              <p className="mt-1 text-sm text-slate-600">{description}</p>
             ) : null}
           </div>
-          <button
+          <Button
             type="button"
             onClick={onClose}
             className={secondaryButtonClass}
           >
             Tutup
-          </button>
+          </Button>
         </div>
         <div className="mt-6">{children}</div>
       </aside>
@@ -84,9 +94,9 @@ export function ExpenseFormModal({
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <Button type="button" className={className} onClick={() => setOpen(true)}>
         {label ?? (isCorrection ? "Koreksi" : "Tambah Pengeluaran")}
-      </button>
+      </Button>
 
       <ModalFrame
         open={open}
@@ -102,30 +112,30 @@ export function ExpenseFormModal({
           {expense ? <input type="hidden" name="id" value={expense.id} /> : null}
 
           <div>
-            <label htmlFor="description" className="text-sm font-medium">
+            <Label htmlFor="description" className="text-sm font-medium">
               Nama / deskripsi
-            </label>
-            <input
+            </Label>
+            <Input
               id="description"
               name="description"
               required
               maxLength={500}
               defaultValue={expense?.description ?? ""}
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="Contoh: Pembayaran listrik toko"
             />
           </div>
 
           <div>
-            <label htmlFor="expense_category_id" className="text-sm font-medium">
+            <Label htmlFor="expense_category_id" className="text-sm font-medium">
               Kategori
-            </label>
-            <select
-              id="expense_category_id"
+            </Label>
+            <SelectField
               name="expense_category_id"
-              required
               defaultValue={expense?.category_id ?? ""}
-              className={inputClass}
+              id="expense_category_id"
+              className="mt-1 h-10 w-full bg-white"
+              placeholder="Pilih kategori"
             >
               <option value="">Pilih kategori</option>
               {categories.map((category) => (
@@ -133,15 +143,15 @@ export function ExpenseFormModal({
                   {category.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="amount" className="text-sm font-medium">
+              <Label htmlFor="amount" className="text-sm font-medium">
                 Nominal (Rp)
-              </label>
-              <input
+              </Label>
+              <Input
                 id="amount"
                 name="amount"
                 type="number"
@@ -149,36 +159,36 @@ export function ExpenseFormModal({
                 step="1"
                 required
                 defaultValue={expense ? String(expense.amount) : ""}
-                className={inputClass}
+                className="mt-1 h-10 bg-white"
                 placeholder="0"
               />
             </div>
             <div>
-              <label htmlFor="expense_date" className="text-sm font-medium">
+              <Label htmlFor="expense_date" className="text-sm font-medium">
                 Tanggal
-              </label>
-              <input
+              </Label>
+              <Input
                 id="expense_date"
                 name="expense_date"
                 type="date"
                 required
                 defaultValue={expense?.expense_date ?? ""}
-                className={inputClass}
+                className="mt-1 h-10 bg-white"
               />
             </div>
           </div>
 
           {isCorrection ? (
             <div>
-              <label htmlFor="reason" className="text-sm font-medium">
+              <Label htmlFor="reason" className="text-sm font-medium">
                 Alasan koreksi
-              </label>
-              <input
+              </Label>
+              <Input
                 id="reason"
                 name="reason"
                 required
                 maxLength={500}
-                className={inputClass}
+                className="mt-1 h-10 bg-white"
                 placeholder="Contoh: Salah input nominal"
               />
             </div>
@@ -189,13 +199,13 @@ export function ExpenseFormModal({
             <SubmitButton pending={pending} className={primaryButtonClass}>
               {isCorrection ? "Simpan Koreksi" : "Simpan Pengeluaran"}
             </SubmitButton>
-            <button
+            <Button
               type="button"
               onClick={() => setOpen(false)}
               className={secondaryButtonClass}
             >
               Batal
-            </button>
+            </Button>
           </div>
         </form>
       </ModalFrame>
@@ -212,13 +222,13 @@ export function VoidExpenseModal({ expense }: { expense: ExpenseView }) {
 
   return (
     <>
-      <button
+      <Button
         type="button"
         className={secondaryButtonClass}
         onClick={() => setOpen(true)}
       >
         Hapus
-      </button>
+      </Button>
 
       <ModalFrame
         open={open}
@@ -228,19 +238,19 @@ export function VoidExpenseModal({ expense }: { expense: ExpenseView }) {
       >
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="id" value={expense.id} />
-          <p className="rounded-md bg-zinc-50 p-3 text-sm text-zinc-700">
+          <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">
             {expense.description} — {expense.category_name}
           </p>
           <div>
-            <label htmlFor="void-reason" className="text-sm font-medium">
+            <Label htmlFor="void-reason" className="text-sm font-medium">
               Alasan pembatalan
-            </label>
-            <input
+            </Label>
+            <Input
               id="void-reason"
               name="reason"
               required
               maxLength={500}
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="Contoh: Duplikat input"
             />
           </div>
@@ -249,13 +259,13 @@ export function VoidExpenseModal({ expense }: { expense: ExpenseView }) {
             <SubmitButton pending={pending} className={primaryButtonClass}>
               Batalkan Pengeluaran
             </SubmitButton>
-            <button
+            <Button
               type="button"
               onClick={() => setOpen(false)}
               className={secondaryButtonClass}
             >
               Tutup
-            </button>
+            </Button>
           </div>
         </form>
       </ModalFrame>
@@ -285,16 +295,16 @@ function RenameCategoryModal({
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="id" value={category.id} />
         <div>
-          <label htmlFor="rename-category" className="text-sm font-medium">
+          <Label htmlFor="rename-category" className="text-sm font-medium">
             Nama kategori
-          </label>
-          <input
+          </Label>
+          <Input
             id="rename-category"
             name="name"
             required
             maxLength={100}
             defaultValue={category.name}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <ActionMessage state={state} />
@@ -319,15 +329,15 @@ export function ExpenseCategoryManager({
     <div className="grid gap-6 lg:grid-cols-2">
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="category-name" className="text-sm font-medium">
+          <Label htmlFor="category-name" className="text-sm font-medium">
             Nama kategori baru
-          </label>
-          <input
+          </Label>
+          <Input
             id="category-name"
             name="name"
             required
             maxLength={100}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
             placeholder="Contoh: Internet & Pulsa"
           />
         </div>
@@ -335,49 +345,47 @@ export function ExpenseCategoryManager({
         <SubmitButton pending={pending}>Tambah Kategori</SubmitButton>
       </form>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-zinc-200">
-          <thead>
-            <tr>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Kategori
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Status
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {categories.map((category) => (
-              <tr key={category.id}>
-                <td className="px-3 py-2 text-sm text-zinc-800">
-                  {category.name}
-                </td>
-                <td className="px-3 py-2 text-sm text-zinc-800">
-                  <form action={toggleExpenseCategoryActiveAction}>
-                    <input type="hidden" name="id" value={category.id} />
-                    <button type="submit" className={secondaryButtonClass}>
-                      {category.is_active ? "Aktif" : "Nonaktif"}
-                    </button>
-                  </form>
-                </td>
-                <td className="px-3 py-2 text-sm text-zinc-800">
-                  <button
-                    type="button"
-                    className={secondaryButtonClass}
-                    onClick={() => setRenaming(category)}
-                  >
-                    Ubah
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-teal-50/40">
+            <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Kategori
+            </TableHead>
+            <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Status
+            </TableHead>
+            <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Aksi
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="divide-y divide-slate-100">
+          {categories.map((category) => (
+            <TableRow key={category.id} className="hover:bg-teal-50/40">
+              <TableCell className="px-3 py-3 text-sm text-slate-800">
+                {category.name}
+              </TableCell>
+              <TableCell className="px-3 py-3 text-sm text-slate-800">
+                <CompactActionForm
+                  action={toggleExpenseCategoryActiveAction}
+                  submitLabel={category.is_active ? "Aktif" : "Nonaktif"}
+                >
+                  <input type="hidden" name="id" value={category.id} />
+                </CompactActionForm>
+              </TableCell>
+              <TableCell className="px-3 py-3 text-sm text-slate-800">
+                <Button
+                  type="button"
+                  className={secondaryButtonClass}
+                  onClick={() => setRenaming(category)}
+                >
+                  Ubah
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
       {renaming ? (
         <RenameCategoryModal

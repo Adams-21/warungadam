@@ -87,7 +87,7 @@ export function DashboardChart({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-zinc-600">
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-slate-600">
         {series.map((item) => (
           <span key={item.label} className="inline-flex items-center gap-1.5">
             <span
@@ -97,7 +97,7 @@ export function DashboardChart({
             {item.label}
           </span>
         ))}
-        <span className="ml-auto text-zinc-500">
+        <span className="ml-auto text-slate-500">
           {granularity === "daily" ? "Per hari" : "Per bulan"}
         </span>
       </div>
@@ -124,7 +124,7 @@ export function DashboardChart({
                 x={PADDING.left - 8}
                 y={grid.y + 4}
                 textAnchor="end"
-                className="fill-zinc-500 text-[10px]"
+                className="fill-slate-500 text-[10px]"
               >
                 {compactValue(gridValues[index])}
               </text>
@@ -145,7 +145,7 @@ export function DashboardChart({
                 x={x}
                 y={HEIGHT - 10}
                 textAnchor="middle"
-                className="fill-zinc-500 text-[10px]"
+                className="fill-slate-500 text-[10px]"
               >
                 {points[index]!.label}
               </text>

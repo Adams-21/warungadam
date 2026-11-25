@@ -3,10 +3,11 @@
 import { Prisma, SupplierReturnResolution } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { priceSchema, uuidSchema } from "@/lib/schemas";
 import { generateDocumentNumber } from "@/lib/sequence";
@@ -65,49 +66,49 @@ export async function createSupplierReturnAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const receiptItemIds = formData.getAll("goods_receipt_item_id");
-  const batchIds = formData.getAll("batch_id");
-  const variantIds = formData.getAll("variant_id");
-  const quantities = formData.getAll("qty");
-  const unitPrices = formData.getAll("unit_price");
-
-  const parsed = createSupplierReturnSchema.safeParse({
-    purchase_id: formData.get("purchase_id"),
-    return_date: parseDateInput(formData.get("return_date")),
-    resolution_type: formData.get("resolution_type"),
-    return_amount: formData.get("return_amount") ?? "0",
-    settlement_date: formData.get("settlement_date"),
-    reason: formData.get("reason"),
-    items: receiptItemIds
-      .map((receiptItemId, index) => ({
-        goods_receipt_item_id: receiptItemId,
-        batch_id: batchIds[index] ?? null,
-        variant_id: variantIds[index] ?? null,
-        qty: quantities[index] ?? null,
-        unit_price: unitPrices[index] ?? "0",
-      }))
-      .filter(
-        (item) =>
-          typeof item.goods_receipt_item_id === "string" &&
-          item.goods_receipt_item_id.trim() !== "" &&
-          Number(item.qty) > 0,
-      ),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const settlementDate = parsed.data.settlement_date
-    ? parseDateInput(parsed.data.settlement_date)
-    : null;
-  if (parsed.data.settlement_date && !settlementDate) {
-    return { error: "Tanggal realisasi retur tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const receiptItemIds = formData.getAll("goods_receipt_item_id");
+    const batchIds = formData.getAll("batch_id");
+    const variantIds = formData.getAll("variant_id");
+    const quantities = formData.getAll("qty");
+    const unitPrices = formData.getAll("unit_price");
+
+    const parsed = createSupplierReturnSchema.safeParse({
+      purchase_id: formData.get("purchase_id"),
+      return_date: parseDateInput(formData.get("return_date")),
+      resolution_type: formData.get("resolution_type"),
+      return_amount: formData.get("return_amount") ?? "0",
+      settlement_date: formData.get("settlement_date"),
+      reason: formData.get("reason"),
+      items: receiptItemIds
+        .map((receiptItemId, index) => ({
+          goods_receipt_item_id: receiptItemId,
+          batch_id: batchIds[index] ?? null,
+          variant_id: variantIds[index] ?? null,
+          qty: quantities[index] ?? null,
+          unit_price: unitPrices[index] ?? "0",
+        }))
+        .filter(
+          (item) =>
+            typeof item.goods_receipt_item_id === "string" &&
+            item.goods_receipt_item_id.trim() !== "" &&
+            Number(item.qty) > 0,
+        ),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const settlementDate = parsed.data.settlement_date
+      ? parseDateInput(parsed.data.settlement_date)
+      : null;
+    if (parsed.data.settlement_date && !settlementDate) {
+      return { error: "Tanggal realisasi retur tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const created = await prisma.$transaction(async (tx) => {
       const purchase = await tx.purchases.findUnique({
         where: { id: parsed.data.purchase_id },
@@ -320,6 +321,6 @@ export async function createSupplierReturnAction(
     revalidateSupplierReturnPaths();
     return { success: `Retur supplier ${created.return_number} berhasil dicatat.` };
   } catch (error) {
-    return toActionError(error, "Gagal mencatat retur supplier.");
+    return { error: getErrorMessage(error) };
   }
 }

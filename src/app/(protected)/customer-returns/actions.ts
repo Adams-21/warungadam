@@ -9,10 +9,11 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { priceSchema, uuidSchema } from "@/lib/schemas";
 import { generateDocumentNumber } from "@/lib/sequence";
@@ -88,39 +89,39 @@ export async function createCustomerReturnAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const saleItemIds = formData.getAll("sale_item_id");
-  const variantIds = formData.getAll("variant_id");
-  const quantities = formData.getAll("qty");
-  const conditions = formData.getAll("condition");
-  const unitCosts = formData.getAll("unit_cost");
-
-  const parsed = createCustomerReturnSchema.safeParse({
-    original_sale_id: formData.get("original_sale_id"),
-    return_date: parseDateInput(formData.get("return_date")),
-    reason: formData.get("reason"),
-    items: variantIds
-      .map((variantId, index) => ({
-        sale_item_id: saleItemIds[index] ?? null,
-        variant_id: variantId,
-        qty: quantities[index] ?? null,
-        condition: conditions[index] ?? null,
-        unit_cost: unitCosts[index] ?? "0",
-      }))
-      .filter(
-        (item) =>
-          typeof item.variant_id === "string" &&
-          item.variant_id.trim() !== "" &&
-          Number(item.qty) > 0,
-      ),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const saleItemIds = formData.getAll("sale_item_id");
+    const variantIds = formData.getAll("variant_id");
+    const quantities = formData.getAll("qty");
+    const conditions = formData.getAll("condition");
+    const unitCosts = formData.getAll("unit_cost");
+
+    const parsed = createCustomerReturnSchema.safeParse({
+      original_sale_id: formData.get("original_sale_id"),
+      return_date: parseDateInput(formData.get("return_date")),
+      reason: formData.get("reason"),
+      items: variantIds
+        .map((variantId, index) => ({
+          sale_item_id: saleItemIds[index] ?? null,
+          variant_id: variantId,
+          qty: quantities[index] ?? null,
+          condition: conditions[index] ?? null,
+          unit_cost: unitCosts[index] ?? "0",
+        }))
+        .filter(
+          (item) =>
+            typeof item.variant_id === "string" &&
+            item.variant_id.trim() !== "" &&
+            Number(item.qty) > 0,
+        ),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const created = await prisma.$transaction(async (tx) => {
       let allocations: CustomerReturnAllocation[] = [];
       let refundContext = {
@@ -400,7 +401,7 @@ export async function createCustomerReturnAction(
     revalidateCustomerReturnPaths();
     return { success: `Retur ${created.return_number} berhasil dicatat.` };
   } catch (error) {
-    return toActionError(error, "Gagal mencatat retur pelanggan.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -408,18 +409,18 @@ export async function updateCustomerReturnClaimStatusAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = claimStatusSchema.safeParse({
-    id: formData.get("id"),
-    status: formData.get("status"),
-    notes: formData.get("notes") ?? undefined,
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = claimStatusSchema.safeParse({
+      id: formData.get("id"),
+      status: formData.get("status"),
+      notes: formData.get("notes") ?? undefined,
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     await prisma.$transaction(async (tx) => {
       const current = await tx.customerReturns.findUnique({
         where: { id: parsed.data.id },
@@ -454,7 +455,7 @@ export async function updateCustomerReturnClaimStatusAction(
     revalidateCustomerReturnPaths();
     return { success: "Status klaim retur diperbarui." };
   } catch (error) {
-    return toActionError(error, "Gagal memperbarui status klaim retur.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -462,25 +463,25 @@ export async function updateCustomerReturnFundStatusAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = fundStatusSchema.safeParse({
-    id: formData.get("id"),
-    status: formData.get("status"),
-    paid_date: formData.get("paid_date"),
-    notes: formData.get("notes") ?? undefined,
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  let paidDate: Date | null = null;
-  if (parsed.data.paid_date) {
-    paidDate = parseDateInput(parsed.data.paid_date);
-    if (!paidDate) return { error: "Tanggal pengembalian dana tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = fundStatusSchema.safeParse({
+      id: formData.get("id"),
+      status: formData.get("status"),
+      paid_date: formData.get("paid_date"),
+      notes: formData.get("notes") ?? undefined,
+    });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    let paidDate: Date | null = null;
+    if (parsed.data.paid_date) {
+      paidDate = parseDateInput(parsed.data.paid_date);
+      if (!paidDate) return { error: "Tanggal pengembalian dana tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     await prisma.$transaction(async (tx) => {
       const current = await tx.customerReturns.findUnique({
         where: { id: parsed.data.id },
@@ -529,6 +530,6 @@ export async function updateCustomerReturnFundStatusAction(
     revalidateCustomerReturnPaths();
     return { success: "Status dana retur diperbarui." };
   } catch (error) {
-    return toActionError(error, "Gagal memperbarui status dana retur.");
+    return { error: getErrorMessage(error) };
   }
 }

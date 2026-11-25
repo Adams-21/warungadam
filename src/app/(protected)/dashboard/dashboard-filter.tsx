@@ -1,10 +1,17 @@
 "use client";
 
 import {
+  Button,
   DateRangeFields,
-  inputClass,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   primaryButtonClass,
 } from "@/components/ui";
+import { useState } from "react";
 
 export function DashboardFilter({
   from,
@@ -15,33 +22,39 @@ export function DashboardFilter({
   to: string;
   granularity: "daily" | "monthly";
 }) {
+  const [view, setView] = useState<"daily" | "monthly">(granularity);
+
   return (
     <form method="get" className="grid gap-4 md:grid-cols-4">
       <DateRangeFields
         from={from}
         to={to}
-        fromLabel="Dari Tanggal"
-        toLabel="Sampai Tanggal"
+        fromLabel="Dari"
+        toLabel="Sampai"
         className="md:col-span-2"
       />
       <div>
-        <label htmlFor="granularity" className="text-sm font-medium">
+        <Label htmlFor="granularity" className="text-sm font-medium text-slate-700">
           Tampilan Tren
-        </label>
-        <select
-          id="granularity"
-          name="granularity"
-          defaultValue={granularity}
-          className={inputClass}
+        </Label>
+        <input type="hidden" name="granularity" value={view} />
+        <Select
+          value={view}
+          onValueChange={(value) => setView(value === "monthly" ? "monthly" : "daily")}
         >
-          <option value="daily">Harian</option>
-          <option value="monthly">Bulanan</option>
-        </select>
+          <SelectTrigger id="granularity" className="mt-1 h-10 w-full bg-white">
+            <SelectValue placeholder="Pilih tampilan" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="daily">Harian</SelectItem>
+            <SelectItem value="monthly">Bulanan</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-end">
-        <button type="submit" className={`${primaryButtonClass} w-full`}>
+        <Button type="submit" className={`${primaryButtonClass} w-full`}>
           Terapkan Filter
-        </button>
+        </Button>
       </div>
     </form>
   );

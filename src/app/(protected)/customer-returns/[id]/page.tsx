@@ -6,6 +6,12 @@ import {
   PageHeading,
   Panel,
   StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/ui";
@@ -20,10 +26,6 @@ import type {
 } from "../types";
 
 export const instant = false;
-
-const thClass =
-  "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
 export default async function CustomerReturnDetailPage({
   params,
@@ -152,47 +154,45 @@ export default async function CustomerReturnDetailPage({
         <Panel title="Status Dana">
           <StatusBadge status={detail.fund_status} />
           {row.refund_paid_date ? (
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-slate-500">
               Dibayar {new Date(row.refund_paid_date).toLocaleDateString("id-ID")}
             </p>
           ) : null}
         </Panel>
         <Panel title="Total Dana Retur">
-          <p className="text-lg font-semibold text-zinc-900">
+          <p className="text-lg font-semibold text-slate-900">
             {formatRupiah(detail.refund_amount)}
           </p>
         </Panel>
         <Panel title="Alasan">
-          <p className="text-sm text-zinc-800">{detail.reason}</p>
+          <p className="text-sm text-slate-800">{detail.reason}</p>
         </Panel>
       </div>
 
       <div className="mt-6">
         <Panel title="Barang Retur">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className={thClass}>Varian</th>
-                  <th className={thClass}>Item Transaksi</th>
-                  <th className={thClass}>Jumlah</th>
-                  <th className={thClass}>Kondisi</th>
-                  <th className={thClass}>HPP Dipulihkan</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className={tdClass}>{item.variant_label}</td>
-                    <td className={tdClass}>{item.sale_item_label ?? "Tanpa referensi"}</td>
-                    <td className={tdClass}>{formatNumber(item.qty)}</td>
-                    <td className={tdClass}>{item.condition}</td>
-                    <td className={tdClass}>{formatRupiah(item.restored_hpp_amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="min-w-full divide-y divide-slate-200">
+            <TableHeader className="bg-slate-50">
+              <TableRow className="hover:bg-teal-50/40">
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Varian</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Item Transaksi</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jumlah</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Kondisi</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">HPP Dipulihkan</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {items.map((item) => (
+                <TableRow key={item.id} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{item.variant_label}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{item.sale_item_label ?? "Tanpa referensi"}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatNumber(item.qty)}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{item.condition}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.restored_hpp_amount)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Panel>
       </div>
 
@@ -215,15 +215,15 @@ export default async function CustomerReturnDetailPage({
           ) : (
             <ul className="space-y-3">
               {histories.map((history) => (
-                <li key={history.id} className="rounded-md border border-zinc-200 p-3">
-                  <p className="text-sm font-medium text-zinc-900">
+                <li key={history.id} className="rounded-md border border-slate-200 p-3">
+                  <p className="text-sm font-medium text-slate-900">
                     {history.status_group}: {history.old_status} → {history.new_status}
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-slate-500">
                     {new Date(history.created_at).toLocaleString("id-ID")} · {history.created_by_name}
                   </p>
                   {history.notes ? (
-                    <p className="mt-1 text-sm text-zinc-700">{history.notes}</p>
+                    <p className="mt-1 text-sm text-slate-700">{history.notes}</p>
                   ) : null}
                 </li>
               ))}

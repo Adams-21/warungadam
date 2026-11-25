@@ -1,12 +1,20 @@
 import {
+  Button,
+  Card,
   DateRangeFields,
   EmptyState,
   PageHeading,
   Panel,
   StatusBadge,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { StockAdjustmentModal } from "./inventory-manager";
@@ -288,9 +296,6 @@ export default async function InventoryPage({
     },
   ];
 
-  const thClass =
-    "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-  const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
   return (
     <>
@@ -303,17 +308,17 @@ export default async function InventoryPage({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
-          <div
+          <Card
             key={card.label}
-            className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
+            className="border-slate-200/80 bg-white p-5 shadow-sm"
           >
-            <p className="text-sm text-zinc-600">{card.label}</p>
-            <p className="mt-2 text-lg font-semibold text-zinc-900">
+            <p className="text-sm text-slate-600">{card.label}</p>
+            <p className="mt-2 text-lg font-semibold tabular-nums text-slate-900">
               {card.label === "Varian Stok Menipis"
                 ? card.value.toString()
                 : formatRupiah(Number(card.value))}
             </p>
-          </div>
+          </Card>
         ))}
       </div>
 
@@ -323,20 +328,19 @@ export default async function InventoryPage({
             title="Stok Produk & Batch FIFO"
             description="Batch aktif diurutkan dari yang paling lama diterima."
           >
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead>
-                  <tr>
-                    <th className={thClass}>Varian</th>
-                    <th className={thClass}>Stok</th>
-                    <th className={thClass}>Stok Rusak</th>
-                    <th className={thClass}>Batch Aktif (FIFO)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+            <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-teal-50/40">
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Varian</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Stok</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Stok Rusak</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Batch Aktif (FIFO)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-100">
                   {productViews.map((variant) => (
-                    <tr key={variant.id}>
-                      <td className={`${tdClass} font-medium`}>
+                    <TableRow key={variant.id} className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                         {variant.product_name} — {variant.variant_name}
                         {variant.is_low ? (
                           <div className="mt-1">
@@ -345,20 +349,20 @@ export default async function InventoryPage({
                             </StatusBadge>
                           </div>
                         ) : null}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {formatNumber(variant.stock_qty)} {variant.unit_name}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {formatNumber(variant.damaged_stock_qty)}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {variant.batches.length === 0 ? (
-                          <span className="text-zinc-400">Tidak ada batch aktif</span>
+                          <span className="text-slate-400">Tidak ada batch aktif</span>
                         ) : (
                           <ul className="space-y-1">
                             {variant.batches.map((batch) => (
-                              <li key={batch.id} className="text-xs text-zinc-600">
+                              <li key={batch.id} className="text-xs text-slate-600">
                                 {batch.received_at} · {batch.source_type} ·{" "}
                                 {formatNumber(batch.remaining_qty)} ×{" "}
                                 {formatRupiah(batch.unit_cost)} ={" "}
@@ -367,22 +371,21 @@ export default async function InventoryPage({
                             ))}
                           </ul>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
                   {productViews.length === 0 ? (
-                    <tr>
-                      <td className={tdClass} colSpan={4}>
+                    <TableRow className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800" colSpan={4}>
                         <EmptyState
                           compact
                           title="Belum ada varian produk"
                         />
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : null}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+            </Table>
           </Panel>
         </div>
       ) : null}
@@ -393,20 +396,19 @@ export default async function InventoryPage({
             title="Stok Kemasan"
             description="Nilai aset memakai rata-rata HPP kemasan."
           >
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead>
-                  <tr>
-                    <th className={thClass}>Kemasan</th>
-                    <th className={thClass}>Stok</th>
-                    <th className={thClass}>Rata-rata HPP</th>
-                    <th className={thClass}>Nilai Aset</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+            <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-teal-50/40">
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Kemasan</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Stok</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Rata-rata HPP</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nilai Aset</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-100">
                   {packagingViews.map((material) => (
-                    <tr key={material.id}>
-                      <td className={`${tdClass} font-medium`}>
+                    <TableRow key={material.id} className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                         {material.name}
                         {material.is_low ? (
                           <div className="mt-1">
@@ -415,28 +417,27 @@ export default async function InventoryPage({
                             </StatusBadge>
                           </div>
                         ) : null}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {formatNumber(material.stock_qty)} {material.unit_name}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {formatRupiah(Math.round(material.average_unit_cost))}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {formatRupiah(material.asset_value)}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
                   {packagingViews.length === 0 ? (
-                    <tr>
-                      <td className={tdClass} colSpan={4}>
+                    <TableRow className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800" colSpan={4}>
                         <EmptyState compact title="Belum ada kemasan" />
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : null}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+            </Table>
           </Panel>
         </div>
       ) : null}
@@ -449,11 +450,19 @@ export default async function InventoryPage({
           >
             <form method="get" className="grid gap-3 md:grid-cols-5">
               <input type="hidden" name="tab" value="mutations" />
-              <select name="item_type" defaultValue={itemType} className={inputClass}>
+              <SelectField
+                name="item_type"
+                defaultValue={itemType}
+                className="mt-1 h-10 w-full bg-white"
+              >
                 <option value="product">Produk</option>
                 <option value="packaging">Kemasan</option>
-              </select>
-              <select name="item_id" defaultValue={itemId} className={inputClass}>
+              </SelectField>
+              <SelectField
+                name="item_id"
+                defaultValue={itemId}
+                className="mt-1 h-10 w-full bg-white"
+              >
                 <option value="">Semua item</option>
                 {itemType === "product"
                   ? productViews.map((variant) => (
@@ -466,74 +475,76 @@ export default async function InventoryPage({
                         {material.name}
                       </option>
                     ))}
-              </select>
-              <select name="group" defaultValue={group} className={inputClass}>
+              </SelectField>
+              <SelectField
+                name="group"
+                defaultValue={group}
+                className="mt-1 h-10 w-full bg-white"
+              >
                 <option value="ALL">Semua tipe</option>
                 <option value="IN">IN</option>
                 <option value="OUT">OUT</option>
                 <option value="ADJUSTMENT">ADJUSTMENT</option>
-              </select>
+              </SelectField>
               <DateRangeFields
                 from={toInputDate(fromDate)}
                 to={toInputDate(toDate)}
               />
               <div className="flex items-end md:col-span-5">
-                <button type="submit" className={primaryButtonClass}>
+                <Button type="submit" className={primaryButtonClass}>
                   Filter
-                </button>
+                </Button>
               </div>
             </form>
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-200">
-                <thead>
-                  <tr>
-                    <th className={thClass}>Tanggal</th>
-                    <th className={thClass}>Item</th>
-                    <th className={thClass}>Tipe</th>
-                    <th className={thClass}>Kelompok</th>
-                    <th className={thClass}>Perubahan</th>
-                    <th className={thClass}>Saldo</th>
-                    <th className={thClass}>Referensi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+            <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-teal-50/40">
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Item</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tipe</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Kelompok</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Perubahan</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Saldo</TableHead>
+                    <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Referensi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-100">
                   {mutationViews.map((mutation) => (
-                    <tr key={`${mutation.item_type}-${mutation.id}`}>
-                      <td className={tdClass}>{mutation.date}</td>
-                      <td className={tdClass}>{mutation.item_name}</td>
-                      <td className={tdClass}>{mutation.movement_type}</td>
-                      <td className={tdClass}>{mutation.group}</td>
-                      <td className={tdClass}>
+                    <TableRow key={`${mutation.item_type}-${mutation.id}`} className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{mutation.date}</TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{mutation.item_name}</TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{mutation.movement_type}</TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{mutation.group}</TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {formatNumber(mutation.qty_change, 4)}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {mutation.balance_after === null
                           ? "-"
                           : formatNumber(mutation.balance_after, 4)}
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         <p>{mutation.reference_number}</p>
                         {mutation.notes ? (
-                          <p className="text-xs text-zinc-500">{mutation.notes}</p>
+                          <p className="text-xs text-slate-500">{mutation.notes}</p>
                         ) : null}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
                   {mutationViews.length === 0 ? (
-                    <tr>
-                      <td className={tdClass} colSpan={7}>
+                    <TableRow className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800" colSpan={7}>
                         <EmptyState
                           compact
                           title="Tidak ada mutasi"
                           description="Tidak ada mutasi pada filter ini."
                         />
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : null}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+            </Table>
           </Panel>
         </div>
       ) : null}

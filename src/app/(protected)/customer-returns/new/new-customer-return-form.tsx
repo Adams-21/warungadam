@@ -2,10 +2,14 @@
 
 import {
   ActionMessage,
+  Button,
+  Input,
+  Label,
   SubmitButton,
   inputClass,
   secondaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { useActionState, useState } from "react";
@@ -93,28 +97,29 @@ export function NewCustomerReturnForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label htmlFor="return_date" className="text-sm font-medium">
+          <Label htmlFor="return_date" className="text-sm font-medium">
             Tanggal Retur
-          </label>
-          <input
+          </Label>
+          <Input
             id="return_date"
             name="return_date"
             type="date"
             required
             defaultValue={todayInput()}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div>
-          <label htmlFor="original_sale_id" className="text-sm font-medium">
+          <Label htmlFor="original_sale_id" className="text-sm font-medium">
             Transaksi Penjualan Asal
-          </label>
-          <select
-            id="original_sale_id"
+          </Label>
+          <SelectField
             name="original_sale_id"
-            value={saleId}
-            onChange={(event) => handleSaleChange(event.target.value)}
-            className={inputClass}
+            defaultValue={saleId}
+            id="original_sale_id"
+            className="mt-1 h-10 w-full bg-white"
+            onValueChange={(value) => handleSaleChange(value)}
+            placeholder="Tanpa transaksi asal"
           >
             <option value="">Tanpa transaksi asal</option>
             {sales.map((sale) => (
@@ -122,14 +127,14 @@ export function NewCustomerReturnForm({
                 {sale.transaction_number} · {new Date(sale.transaction_date).toLocaleDateString("id-ID")}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
       </div>
 
       <div>
-        <label htmlFor="reason" className="text-sm font-medium">
+        <Label htmlFor="reason" className="text-sm font-medium">
           Alasan Retur
-        </label>
+        </Label>
         <textarea
           id="reason"
           name="reason"
@@ -143,14 +148,14 @@ export function NewCustomerReturnForm({
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-800">Barang Retur</h3>
-          <button type="button" onClick={addBlankRow} className={secondaryButtonClass}>
+          <h3 className="text-sm font-semibold text-slate-800">Barang Retur</h3>
+          <Button type="button" onClick={addBlankRow} className={secondaryButtonClass}>
             Tambah Barang
-          </button>
+          </Button>
         </div>
 
         {rows.length === 0 ? (
-          <p className="rounded-md border border-dashed border-zinc-300 p-4 text-sm text-zinc-500">
+          <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">
             Pilih transaksi asal atau tambah barang tanpa referensi.
           </p>
         ) : (
@@ -162,18 +167,18 @@ export function NewCustomerReturnForm({
               return (
                 <div
                   key={row.key}
-                  className="grid gap-3 rounded-md border border-zinc-200 p-3 md:grid-cols-[2fr_1fr_1fr_1fr_auto]"
+                  className="grid gap-3 rounded-md border border-slate-200 p-3 md:grid-cols-[2fr_1fr_1fr_1fr_auto]"
                 >
                   <div>
-                    <label className="text-xs font-medium text-zinc-600">
+                    <Label className="text-xs font-medium text-slate-600">
                       Varian Barang
-                    </label>
+                    </Label>
                     {saleItem ? (
                       <>
                         <input type="hidden" name="sale_item_id" value={row.sale_item_id} />
                         <input type="hidden" name="variant_id" value={row.variant_id} />
-                        <p className="mt-1 text-sm text-zinc-800">{saleItem.variant_label}</p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="mt-1 text-sm text-slate-800">{saleItem.variant_label}</p>
+                        <p className="text-xs text-slate-500">
                           Maks. {formatNumber(saleItem.available_qty)} · HPP{" "}
                           {formatRupiah(row.unit_cost === "" ? 0 : Number(row.unit_cost))}
                         </p>
@@ -181,19 +186,19 @@ export function NewCustomerReturnForm({
                     ) : (
                       <>
                         <input type="hidden" name="sale_item_id" value="" />
-                        <select
-                          value={row.variant_id}
-                          onChange={(event) => {
+                        <SelectField
+                          defaultValue={row.variant_id}
+                          className="mt-1 h-10 w-full bg-white"
+                          onValueChange={(value) => {
                             const variant = variants.find(
-                              (item) => item.id === event.target.value,
+                              (item) => item.id === value,
                             );
                             updateRow(row.key, {
-                              variant_id: event.target.value,
+                              variant_id: value,
                               unit_cost: String(variant?.latest_unit_cost ?? 0),
                             });
                           }}
-                          required
-                          className={`${inputClass} mt-1`}
+                          placeholder="Pilih varian"
                         >
                           <option value="">Pilih varian</option>
                           {variants.map((variant) => (
@@ -201,15 +206,15 @@ export function NewCustomerReturnForm({
                               {variant.label}
                             </option>
                           ))}
-                        </select>
+                        </SelectField>
                       </>
                     )}
                   </div>
                   <div>
-                    <label htmlFor={`qty-${index}`} className="text-xs font-medium text-zinc-600">
+                    <Label htmlFor={`qty-${index}`} className="text-xs font-medium text-slate-600">
                       Jumlah
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id={`qty-${index}`}
                       name="qty"
                       type="number"
@@ -219,31 +224,31 @@ export function NewCustomerReturnForm({
                       value={row.qty}
                       onChange={(event) => updateRow(row.key, { qty: event.target.value })}
                       required
-                      className={`${inputClass} mt-1`}
+                      className="mt-1 h-10 bg-white"
                     />
                   </div>
                   <div>
-                    <label htmlFor={`condition-${index}`} className="text-xs font-medium text-zinc-600">
+                    <Label htmlFor={`condition-${index}`} className="text-xs font-medium text-slate-600">
                       Kondisi
-                    </label>
-                    <select
-                      id={`condition-${index}`}
+                    </Label>
+                    <SelectField
                       name="condition"
-                      value={row.condition}
-                      onChange={(event) =>
-                        updateRow(row.key, { condition: event.target.value })
+                      defaultValue={row.condition}
+                      id={`condition-${index}`}
+                      className="mt-1 h-10 w-full bg-white"
+                      onValueChange={(value) =>
+                        updateRow(row.key, { condition: value })
                       }
-                      className={`${inputClass} mt-1`}
                     >
                       <option value="Layak_jual">Layak Jual</option>
                       <option value="Rusak">Rusak</option>
-                    </select>
+                    </SelectField>
                   </div>
                   <div>
-                    <label htmlFor={`cost-${index}`} className="text-xs font-medium text-zinc-600">
+                    <Label htmlFor={`cost-${index}`} className="text-xs font-medium text-slate-600">
                       HPP Baru
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id={`cost-${index}`}
                       name="unit_cost"
                       type="number"
@@ -254,16 +259,16 @@ export function NewCustomerReturnForm({
                         updateRow(row.key, { unit_cost: event.target.value })
                       }
                       readOnly={Boolean(saleItem)}
-                      className={`${inputClass} mt-1`}
+                      className="mt-1 h-10 bg-white"
                     />
                   </div>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => removeRow(row.key)}
                     className={`${secondaryButtonClass} self-end`}
                   >
                     Hapus
-                  </button>
+                  </Button>
                 </div>
               );
             })}
@@ -271,12 +276,12 @@ export function NewCustomerReturnForm({
         )}
       </div>
 
-      <div className="rounded-md bg-zinc-50 p-4">
-        <p className="text-sm text-zinc-600">
+      <div className="rounded-md bg-slate-50 p-4">
+        <p className="text-sm text-slate-600">
           Estimasi dana retur sebelum diskon transaksi:{" "}
-          <strong className="text-zinc-900">{formatRupiah(estimatedRefund)}</strong>
+          <strong className="text-slate-900">{formatRupiah(estimatedRefund)}</strong>
         </p>
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="mt-1 text-xs text-slate-500">
           HPP input hanya dipakai untuk retur tanpa transaksi asal.
         </p>
       </div>

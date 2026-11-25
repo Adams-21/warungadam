@@ -3,10 +3,19 @@
 import { useActionState, useRef, useState } from "react";
 import {
   ActionMessage,
+  Button,
+  Input,
+  Label,
   SubmitButton,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   secondaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { createSaleAction } from "../actions";
@@ -30,10 +39,6 @@ type ExtraMaterialRow = {
   packaging_material_id: string;
   extra_usage_qty: string;
 };
-
-const thClass =
-  "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
 function rupiah(value: number): number {
   return Number.isFinite(value) ? Math.round(value) : 0;
@@ -200,22 +205,22 @@ export function NewSaleForm({
   const grossProfit = totalRevenue - totalCogs;
   const netGrossProfit = totalRevenue - adminFee - totalCogs;
 
-  const summaryClass = "rounded-lg border border-zinc-200 bg-zinc-50 p-3";
+  const summaryClass = "rounded-lg border border-slate-200 bg-slate-50 p-3";
 
   return (
     <form action={formAction} className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div>
-          <label htmlFor="sales_channel_id" className="text-sm font-medium">
+          <Label htmlFor="sales_channel_id" className="text-sm font-medium">
             Kanal penjualan
-          </label>
-          <select
-            id="sales_channel_id"
+          </Label>
+          <SelectField
             name="sales_channel_id"
-            required
-            value={channelId}
-            onChange={(event) => handleChannelChange(event.target.value)}
-            className={inputClass}
+            defaultValue={channelId}
+            id="sales_channel_id"
+            className="mt-1 h-10 w-full bg-white"
+            placeholder="Pilih kanal"
+            onValueChange={handleChannelChange}
           >
             <option value="" disabled>
               Pilih kanal
@@ -226,44 +231,44 @@ export function NewSaleForm({
                 {channel.is_marketplace ? " (marketplace)" : ""}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div>
-          <label htmlFor="transaction_date" className="text-sm font-medium">
+          <Label htmlFor="transaction_date" className="text-sm font-medium">
             Tanggal transaksi
-          </label>
-          <input
+          </Label>
+          <Input
             id="transaction_date"
             name="transaction_date"
             type="date"
             required
             defaultValue={today}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div>
-          <label htmlFor="external_order_number" className="text-sm font-medium">
+          <Label htmlFor="external_order_number" className="text-sm font-medium">
             No. order/resi eksternal
-          </label>
-          <input
+          </Label>
+          <Input
             id="external_order_number"
             name="external_order_number"
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div>
-          <label htmlFor="package_size_id" className="text-sm font-medium">
+          <Label htmlFor="package_size_id" className="text-sm font-medium">
             Ukuran paket kemasan
-          </label>
-          <select
-            id="package_size_id"
+          </Label>
+          <SelectField
             name="package_size_id"
-            value={packageSizeId}
-            onChange={(event) => {
-              setPackageSizeId(event.target.value);
+            defaultValue={packageSizeId}
+            id="package_size_id"
+            className="mt-1 h-10 w-full bg-white"
+            onValueChange={(value) => {
+              setPackageSizeId(value);
               setUsageOverrides({});
             }}
-            className={inputClass}
           >
             <option value="">Tanpa kemasan standar</option>
             {packageSizes.map((size) => (
@@ -271,13 +276,13 @@ export function NewSaleForm({
                 {size.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div>
-          <label htmlFor="package_count" className="text-sm font-medium">
+          <Label htmlFor="package_count" className="text-sm font-medium">
             Jumlah paket
-          </label>
-          <input
+          </Label>
+          <Input
             id="package_count"
             name="package_count"
             type="number"
@@ -289,14 +294,14 @@ export function NewSaleForm({
               setPackageCount(event.target.value);
               setUsageOverrides({});
             }}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div>
-          <label htmlFor="discount_amount" className="text-sm font-medium">
+          <Label htmlFor="discount_amount" className="text-sm font-medium">
             Diskon transaksi
-          </label>
-          <input
+          </Label>
+          <Input
             id="discount_amount"
             name="discount_amount"
             type="number"
@@ -304,14 +309,14 @@ export function NewSaleForm({
             step="1"
             value={discountAmount}
             onChange={(event) => setDiscountAmount(event.target.value)}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div>
-          <label htmlFor="additional_fee_amount" className="text-sm font-medium">
+          <Label htmlFor="additional_fee_amount" className="text-sm font-medium">
             Biaya tambahan pelanggan
-          </label>
-          <input
+          </Label>
+          <Input
             id="additional_fee_amount"
             name="additional_fee_amount"
             type="number"
@@ -319,27 +324,27 @@ export function NewSaleForm({
             step="1"
             value={additionalFee}
             onChange={(event) => setAdditionalFee(event.target.value)}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-zinc-900">Item Penjualan</h3>
-        <div className="mt-2 overflow-hidden rounded-lg border border-zinc-200">
-          <table className="min-w-full divide-y divide-zinc-200">
-            <thead className="bg-zinc-50">
-              <tr>
-                <th className={thClass}>Varian</th>
-                <th className={thClass}>Jumlah</th>
-                <th className={thClass}>Stok</th>
-                <th className={thClass}>Harga Jual</th>
-                <th className={thClass}>Diskon Item</th>
-                <th className={thClass}>Subtotal</th>
-                <th className={thClass}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
+        <h3 className="text-sm font-semibold text-slate-900">Item Penjualan</h3>
+        <div className="mt-2 overflow-hidden rounded-lg border border-slate-200">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow className="hover:bg-teal-50/40">
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Varian</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jumlah</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Stok</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Harga Jual</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Diskon Item</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
               {rows.map((row) => {
                 const variant = variants.find(
                   (item) => item.id === row.variant_id,
@@ -353,16 +358,16 @@ export function NewSaleForm({
                 );
 
                 return (
-                  <tr key={row.key}>
-                    <td className={tdClass}>
-                      <select
+                  <TableRow key={row.key} className="hover:bg-teal-50/40">
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                      <SelectField
                         name="variant_id"
-                        required
-                        value={row.variant_id}
-                        onChange={(event) =>
-                          updateRow(row.key, { variant_id: event.target.value })
+                        defaultValue={row.variant_id}
+                        className="mt-1 h-10 w-full bg-white"
+                        placeholder="Pilih varian"
+                        onValueChange={(value) =>
+                          updateRow(row.key, { variant_id: value })
                         }
-                        className={inputClass}
                       >
                         <option value="" disabled>
                           Pilih varian
@@ -372,10 +377,10 @@ export function NewSaleForm({
                             {item.label}
                           </option>
                         ))}
-                      </select>
-                    </td>
-                    <td className={tdClass}>
-                      <input
+                      </SelectField>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                      <Input
                         name="qty"
                         type="number"
                         min="0.0001"
@@ -386,16 +391,16 @@ export function NewSaleForm({
                         onChange={(event) =>
                           updateRow(row.key, { qty: event.target.value })
                         }
-                        className={inputClass}
+                        className="mt-1 h-10 bg-white"
                       />
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {variant
                         ? `${formatNumber(variant.stock_qty, 4)} ${variant.unit_name}`
                         : "-"}
-                    </td>
-                    <td className={tdClass}>
-                      <input
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                      <Input
                         name="unit_price"
                         type="number"
                         min="0"
@@ -407,11 +412,11 @@ export function NewSaleForm({
                             unit_selling_price: event.target.value,
                           })
                         }
-                        className={inputClass}
+                        className="mt-1 h-10 bg-white"
                       />
-                    </td>
-                    <td className={tdClass}>
-                      <input
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                      <Input
                         name="item_discount"
                         type="number"
                         min="0"
@@ -422,63 +427,59 @@ export function NewSaleForm({
                             item_discount: event.target.value,
                           })
                         }
-                        className={inputClass}
+                        className="mt-1 h-10 bg-white"
                       />
-                    </td>
-                    <td className={tdClass}>{formatRupiah(subtotal)}</td>
-                    <td className={tdClass}>
-                      <button
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(subtotal)}</TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                      <Button
                         type="button"
                         onClick={() => removeRow(row.key)}
-                        className="text-sm font-medium text-red-700 hover:underline"
+                        className="text-sm font-medium text-rose-700 hover:underline"
                       >
                         Hapus
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
         <div className="mt-2">
-          <button type="button" onClick={addRow} className={secondaryButtonClass}>
+          <Button type="button" onClick={addRow} className={secondaryButtonClass}>
             Tambah Item
-          </button>
+          </Button>
         </div>
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-zinc-900">Pemakaian Kemasan</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Pemakaian Kemasan</h3>
         {selectedSize ? (
-          <div className="mt-2 overflow-hidden rounded-lg border border-zinc-200">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className={thClass}>Material</th>
-                  <th className={thClass}>Takaran Standar / Paket</th>
-                  <th className={thClass}>Pakai Aktual</th>
-                  <th className={thClass}>Satuan</th>
-                  <th className={thClass}>Stok</th>
-                  <th className={thClass}>Estimasi HPP</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
+          <div className="mt-2 overflow-hidden rounded-lg border border-slate-200">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow className="hover:bg-teal-50/40">
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Material</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Takaran Standar / Paket</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Pakai Aktual</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Satuan</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Stok</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Estimasi HPP</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-slate-100">
                 {selectedSize.items.map((item) => (
-                  <tr key={item.packaging_material_id}>
-                    <input
-                      type="hidden"
-                      name="packaging_material_id"
-                      value={item.packaging_material_id}
-                    />
-                    <td className={`${tdClass} font-medium`}>
+                  <TableRow key={item.packaging_material_id} className="hover:bg-teal-50/40">
+                    <input type="hidden" name="packaging_material_id" value={item.packaging_material_id} />
+                    <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                       {item.material_name}
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {formatNumber(item.default_usage_qty, 4)}
-                    </td>
-                    <td className={tdClass}>
-                      <input
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                      <Input
                         name="actual_usage_qty"
                         type="number"
                         min="0"
@@ -490,60 +491,60 @@ export function NewSaleForm({
                             [item.packaging_material_id]: event.target.value,
                           }))
                         }
-                        className={inputClass}
+                        className="mt-1 h-10 bg-white"
                       />
-                    </td>
-                    <td className={tdClass}>{item.usage_unit_name}</td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{item.usage_unit_name}</TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {formatNumber(item.stock_qty, 4)}
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {formatRupiah(
                         rupiah(
                           (Number(usageFor(item)) || 0) *
                             item.average_unit_cost,
                         ),
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         ) : (
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="mt-2 text-sm text-slate-500">
             Transaksi dapat disimpan tanpa kemasan. Pilih ukuran paket untuk
             memuat material standar.
           </p>
         )}
 
         {extraRows.length > 0 ? (
-          <div className="mt-3 overflow-hidden rounded-lg border border-zinc-200">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className={thClass}>Material Tambahan</th>
-                  <th className={thClass}>Jumlah Pakai</th>
-                  <th className={thClass}>Stok</th>
-                  <th className={thClass}>Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
+          <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow className="hover:bg-teal-50/40">
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Material Tambahan</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jumlah Pakai</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Stok</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-slate-100">
                 {extraRows.map((row) => {
                   const material = materialMap.get(row.packaging_material_id);
                   return (
-                    <tr key={row.key}>
-                      <td className={tdClass}>
-                        <select
+                    <TableRow key={row.key} className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                        <SelectField
                           name="extra_material_id"
-                          required
-                          value={row.packaging_material_id}
-                          onChange={(event) =>
+                          defaultValue={row.packaging_material_id}
+                          className="mt-1 h-10 w-full bg-white"
+                          placeholder="Pilih material"
+                          onValueChange={(value) =>
                             updateExtraRow(row.key, {
-                              packaging_material_id: event.target.value,
+                              packaging_material_id: value,
                             })
                           }
-                          className={inputClass}
                         >
                           <option value="" disabled>
                             Pilih material
@@ -553,10 +554,10 @@ export function NewSaleForm({
                               {item.name}
                             </option>
                           ))}
-                        </select>
-                      </td>
-                      <td className={tdClass}>
-                        <input
+                        </SelectField>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                        <Input
                           name="extra_usage_qty"
                           type="number"
                           min="0"
@@ -568,87 +569,87 @@ export function NewSaleForm({
                               extra_usage_qty: event.target.value,
                             })
                           }
-                          className={inputClass}
+                          className="mt-1 h-10 bg-white"
                         />
-                      </td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {material
                           ? `${formatNumber(material.stock_qty, 4)} ${material.usage_unit_name}`
                           : "-"}
-                      </td>
-                      <td className={tdClass}>
-                        <button
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                        <Button
                           type="button"
                           onClick={() =>
                             setExtraRows((current) =>
                               current.filter((item) => item.key !== row.key),
                             )
                           }
-                          className="text-sm font-medium text-red-700 hover:underline"
+                          className="text-sm font-medium text-rose-700 hover:underline"
                         >
                           Hapus
-                        </button>
-                      </td>
-                    </tr>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         ) : null}
 
         <div className="mt-2">
-          <button
+          <Button
             type="button"
             onClick={addExtraRow}
             disabled={materials.length === 0}
             className={secondaryButtonClass}
           >
             Tambah Material Kemasan
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className={summaryClass}>
-          <p className="text-xs font-medium uppercase text-zinc-500">
+          <p className="text-xs font-medium uppercase text-slate-500">
             Total Transaksi
           </p>
-          <p className="mt-1 text-lg font-semibold text-zinc-900">
+          <p className="mt-1 text-lg font-semibold text-slate-900">
             {formatRupiah(totalRevenue)}
           </p>
         </div>
         <div className={summaryClass}>
-          <p className="text-xs font-medium uppercase text-zinc-500">
+          <p className="text-xs font-medium uppercase text-slate-500">
             HPP Produk
           </p>
-          <p className="mt-1 text-lg font-semibold text-zinc-900">
+          <p className="mt-1 text-lg font-semibold text-slate-900">
             {formatRupiah(productCogs)}
           </p>
         </div>
         <div className={summaryClass}>
-          <p className="text-xs font-medium uppercase text-zinc-500">
+          <p className="text-xs font-medium uppercase text-slate-500">
             HPP Kemasan
           </p>
-          <p className="mt-1 text-lg font-semibold text-zinc-900">
+          <p className="mt-1 text-lg font-semibold text-slate-900">
             {formatRupiah(packagingCogs)}
           </p>
         </div>
         <div className={summaryClass}>
-          <p className="text-xs font-medium uppercase text-zinc-500">
+          <p className="text-xs font-medium uppercase text-slate-500">
             Laba Kotor
           </p>
-          <p className="mt-1 text-lg font-semibold text-zinc-900">
+          <p className="mt-1 text-lg font-semibold text-slate-900">
             {formatRupiah(grossProfit)}
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-slate-500">
             Setelah estimasi admin: {formatRupiah(netGrossProfit)}
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-slate-500">
           Estimasi biaya admin: {formatRupiah(adminFee)}
         </p>
         <SubmitButton pending={pending}>Simpan Penjualan</SubmitButton>

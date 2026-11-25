@@ -1,4 +1,13 @@
-import { PageHeading, Panel } from "@/components/ui";
+import {
+  PageHeading,
+  Panel,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { PurchaseTabs } from "../purchase-tabs";
@@ -71,9 +80,6 @@ export default async function PackagingPurchasesPage() {
     })),
   }));
 
-  const thClass =
-    "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-  const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
   return (
     <>
@@ -96,30 +102,30 @@ export default async function PackagingPurchasesPage() {
       <div className="mt-6">
         <Panel title="Riwayat Pembelian Kemasan">
           {purchaseViews.length === 0 ? (
-            <p className="text-sm text-zinc-500">Belum ada pembelian kemasan.</p>
+            <p className="text-sm text-slate-500">Belum ada pembelian kemasan.</p>
           ) : (
             <div className="space-y-4">
               {purchaseViews.map((purchase) => (
                 <div
                   key={purchase.id}
-                  className="rounded-lg border border-zinc-200 p-4"
+                  className="rounded-lg border border-slate-200 p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-zinc-900">
+                      <p className="text-sm font-semibold text-slate-900">
                         {purchase.purchase_number}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500">
+                      <p className="mt-1 text-xs text-slate-500">
                         {new Date(purchase.purchase_date).toLocaleDateString(
                           "id-ID",
                         )}
                       </p>
                     </div>
-                    <p className="text-sm font-medium text-zinc-900">
+                    <p className="text-sm font-medium text-slate-900">
                       {formatRupiah(purchase.total_amount)}
                     </p>
                   </div>
-                  <ul className="mt-3 space-y-1 text-sm text-zinc-700">
+                  <ul className="mt-3 space-y-1 text-sm text-slate-700">
                     {purchase.items.map((item, index) => (
                       <li key={`${purchase.id}-${index}`}>
                         {item.material_name}: {formatNumber(item.purchase_qty, 4)}{" "}
@@ -131,7 +137,7 @@ export default async function PackagingPurchasesPage() {
                     ))}
                   </ul>
                   {purchase.notes ? (
-                    <p className="mt-2 text-xs text-zinc-500">{purchase.notes}</p>
+                    <p className="mt-2 text-xs text-slate-500">{purchase.notes}</p>
                   ) : null}
                 </div>
               ))}
@@ -140,35 +146,45 @@ export default async function PackagingPurchasesPage() {
         </Panel>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-zinc-200">
-          <thead className="bg-zinc-50">
-            <tr>
-              <th className={thClass}>Material</th>
-              <th className={thClass}>Stok Satuan Pakai</th>
-              <th className={thClass}>Biaya Rata-rata</th>
-              <th className={thClass}>Konversi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Material
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Stok Satuan Pakai
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Biaya Rata-rata
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Konversi
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
             {materialViews.map((material) => (
-              <tr key={material.id}>
-                <td className={`${tdClass} font-medium`}>{material.name}</td>
-                <td className={tdClass}>
+              <TableRow key={material.id} className="hover:bg-teal-50/40">
+                <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
+                  {material.name}
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatNumber(material.stock_qty, 4)} {material.usage_unit_name}
-                </td>
-                <td className={tdClass}>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatRupiah(Math.round(material.average_unit_cost))}
-                </td>
-                <td className={tdClass}>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   1 {material.purchase_unit_name} ={" "}
                   {formatNumber(material.conversion_factor, 4)}{" "}
                   {material.usage_unit_name}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </>
   );

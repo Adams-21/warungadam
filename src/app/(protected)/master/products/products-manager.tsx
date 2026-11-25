@@ -3,11 +3,21 @@
 import { useActionState, useState } from "react";
 import {
   ActionMessage,
+  Button,
+  Input,
+  Label,
   Panel,
   SubmitButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   inputClass,
-  secondaryButtonClass,
 } from "@/components/ui";
+import { CompactActionForm } from "@/components/compact-action-form";
+import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE, type ActionState } from "@/lib/action-state";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import {
@@ -29,11 +39,7 @@ import type {
   UnitView,
 } from "./types";
 
-type ToggleAction = (formData: FormData) => Promise<void>;
-
-const thClass =
-  "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
+type ToggleAction = (formData: FormData) => Promise<ActionState>;
 
 function ToggleForm({
   action,
@@ -45,12 +51,12 @@ function ToggleForm({
   active: boolean;
 }) {
   return (
-    <form action={action}>
+    <CompactActionForm
+      action={action}
+      submitLabel={active ? "Nonaktifkan" : "Aktifkan"}
+    >
       <input type="hidden" name="id" value={id} />
-      <button type="submit" className={secondaryButtonClass}>
-        {active ? "Nonaktifkan" : "Aktifkan"}
-      </button>
-    </form>
+    </CompactActionForm>
   );
 }
 
@@ -71,14 +77,15 @@ function CategoryDeleteButton({ categoryId }: { categoryId: string }) {
 
   return (
     <div className="space-y-1">
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={handleDelete}
         disabled={pending}
-        className="rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-md border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Menghapus..." : "Hapus"}
-      </button>
+      </Button>
       <ActionMessage state={state} />
     </div>
   );
@@ -97,14 +104,14 @@ function CategoryForm({ categories }: { categories: CategoryView[] }) {
     >
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="category-name" className="text-sm font-medium">
+          <Label htmlFor="category-name" className="text-sm font-medium">
             Nama kategori
-          </label>
-          <input
+          </Label>
+          <Input
             id="category-name"
             name="name"
             required
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
             placeholder="Contoh: Makanan Ringan"
           />
         </div>
@@ -126,27 +133,26 @@ function ProductForm({ categories }: { categories: CategoryView[] }) {
     <Panel title="Tambah Produk" description="Produk dikelompokkan per kategori.">
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="product-name" className="text-sm font-medium">
+          <Label htmlFor="product-name" className="text-sm font-medium">
             Nama produk
-          </label>
-          <input
+          </Label>
+          <Input
             id="product-name"
             name="name"
             required
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
             placeholder="Contoh: Kopi Sachet"
           />
         </div>
         <div>
-          <label htmlFor="product-category" className="text-sm font-medium">
+          <Label htmlFor="product-category" className="text-sm font-medium">
             Kategori
-          </label>
-          <select
-            id="product-category"
+          </Label>
+          <SelectField
             name="category_id"
-            required
             defaultValue=""
-            className={inputClass}
+            id="product-category"
+            className="mt-1 h-10 w-full bg-white"
           >
             <option value="" disabled>
               Pilih kategori
@@ -156,12 +162,12 @@ function ProductForm({ categories }: { categories: CategoryView[] }) {
                 {category.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div>
-          <label htmlFor="product-description" className="text-sm font-medium">
+          <Label htmlFor="product-description" className="text-sm font-medium">
             Deskripsi
-          </label>
+          </Label>
           <textarea
             id="product-description"
             name="description"
@@ -196,15 +202,14 @@ function VariantForm({
     >
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="variant-product" className="text-sm font-medium">
+          <Label htmlFor="variant-product" className="text-sm font-medium">
             Produk
-          </label>
-          <select
-            id="variant-product"
+          </Label>
+          <SelectField
             name="product_id"
-            required
             defaultValue=""
-            className={inputClass}
+            id="variant-product"
+            className="mt-1 h-10 w-full bg-white"
           >
             <option value="" disabled>
               Pilih produk
@@ -214,31 +219,30 @@ function VariantForm({
                 {product.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="variant-name" className="text-sm font-medium">
+            <Label htmlFor="variant-name" className="text-sm font-medium">
               Nama varian
-            </label>
-            <input
+            </Label>
+            <Input
               id="variant-name"
               name="name"
               required
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="Contoh: Reguler 65g"
             />
           </div>
           <div>
-            <label htmlFor="variant-unit" className="text-sm font-medium">
+            <Label htmlFor="variant-unit" className="text-sm font-medium">
               Satuan
-            </label>
-            <select
-              id="variant-unit"
+            </Label>
+            <SelectField
               name="unit_id"
-              required
               defaultValue=""
-              className={inputClass}
+              id="variant-unit"
+              className="mt-1 h-10 w-full bg-white"
             >
               <option value="" disabled>
                 Pilih satuan
@@ -248,47 +252,47 @@ function VariantForm({
                   {unit.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <label htmlFor="variant-price" className="text-sm font-medium">
+            <Label htmlFor="variant-price" className="text-sm font-medium">
               Harga jual default
-            </label>
-            <input
+            </Label>
+            <Input
               id="variant-price"
               name="default_selling_price"
               type="number"
               min="0"
               step="1"
               required
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="12000"
             />
           </div>
           <div>
-            <label htmlFor="variant-min-stock" className="text-sm font-medium">
+            <Label htmlFor="variant-min-stock" className="text-sm font-medium">
               Stok minimum
-            </label>
-            <input
+            </Label>
+            <Input
               id="variant-min-stock"
               name="min_stock"
               type="number"
               min="0"
               step="0.0001"
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="Opsional"
             />
           </div>
           <div>
-            <label htmlFor="variant-barcode" className="text-sm font-medium">
+            <Label htmlFor="variant-barcode" className="text-sm font-medium">
               Barcode
-            </label>
-            <input
+            </Label>
+            <Input
               id="variant-barcode"
               name="barcode"
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="Opsional"
             />
           </div>
@@ -319,15 +323,14 @@ function ChannelPriceForm({
     >
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="channel-variant" className="text-sm font-medium">
+          <Label htmlFor="channel-variant" className="text-sm font-medium">
             Varian
-          </label>
-          <select
-            id="channel-variant"
+          </Label>
+          <SelectField
             name="variant_id"
-            required
             defaultValue=""
-            className={inputClass}
+            id="channel-variant"
+            className="mt-1 h-10 w-full bg-white"
           >
             <option value="" disabled>
               Pilih varian
@@ -339,19 +342,18 @@ function ChannelPriceForm({
                 </option>
               )),
             )}
-          </select>
+          </SelectField>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="channel-name" className="text-sm font-medium">
+            <Label htmlFor="channel-name" className="text-sm font-medium">
               Kanal
-            </label>
-            <select
-              id="channel-name"
+            </Label>
+            <SelectField
               name="sales_channel_id"
-              required
               defaultValue=""
-              className={inputClass}
+              id="channel-name"
+              className="mt-1 h-10 w-full bg-white"
             >
               <option value="" disabled>
                 Pilih kanal
@@ -361,20 +363,20 @@ function ChannelPriceForm({
                   {channel.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
-            <label htmlFor="channel-price" className="text-sm font-medium">
+            <Label htmlFor="channel-price" className="text-sm font-medium">
               Harga jual
-            </label>
-            <input
+            </Label>
+            <Input
               id="channel-price"
               name="selling_price"
               type="number"
               min="0"
               step="1"
               required
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="13000"
             />
           </div>
@@ -405,15 +407,14 @@ function SupplierPriceForm({
     >
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="supplier-variant" className="text-sm font-medium">
+          <Label htmlFor="supplier-variant" className="text-sm font-medium">
             Varian
-          </label>
-          <select
-            id="supplier-variant"
+          </Label>
+          <SelectField
             name="variant_id"
-            required
             defaultValue=""
-            className={inputClass}
+            id="supplier-variant"
+            className="mt-1 h-10 w-full bg-white"
           >
             <option value="" disabled>
               Pilih varian
@@ -425,19 +426,18 @@ function SupplierPriceForm({
                 </option>
               )),
             )}
-          </select>
+          </SelectField>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="supplier-name" className="text-sm font-medium">
+            <Label htmlFor="supplier-name" className="text-sm font-medium">
               Supplier
-            </label>
-            <select
-              id="supplier-name"
+            </Label>
+            <SelectField
               name="supplier_id"
-              required
               defaultValue=""
-              className={inputClass}
+              id="supplier-name"
+              className="mt-1 h-10 w-full bg-white"
             >
               <option value="" disabled>
                 Pilih supplier
@@ -447,20 +447,20 @@ function SupplierPriceForm({
                   {supplier.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
-            <label htmlFor="supplier-price" className="text-sm font-medium">
+            <Label htmlFor="supplier-price" className="text-sm font-medium">
               Harga beli
-            </label>
-            <input
+            </Label>
+            <Input
               id="supplier-price"
               name="purchase_price"
               type="number"
               min="0"
               step="1"
               required
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="8000"
             />
           </div>
@@ -479,33 +479,32 @@ function ProductsTable({ products }: { products: ProductView[] }) {
       description={`${products.length} produk terdaftar.`}
     >
       {products.length === 0 ? (
-        <p className="text-sm text-zinc-600">Belum ada produk.</p>
+        <p className="text-sm text-slate-600">Belum ada produk.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-zinc-200">
-            <thead>
-              <tr>
-                <th className={thClass}>Produk</th>
-                <th className={thClass}>Kategori</th>
-                <th className={thClass}>Varian</th>
-                <th className={thClass}>Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {products.map((product) => (
-                <tr key={product.id}>
-                  <td className={tdClass}>
+        <Table className="min-w-full divide-y divide-slate-200">
+          <TableHeader>
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Produk</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Kategori</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Varian</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
+            {products.map((product) => (
+              <TableRow key={product.id} className="hover:bg-teal-50/40">
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <p className="font-medium">{product.name}</p>
                     {product.description ? (
-                      <p className="mt-0.5 text-xs text-zinc-500">
+                      <p className="mt-0.5 text-xs text-slate-500">
                         {product.description}
                       </p>
                     ) : null}
-                  </td>
-                  <td className={tdClass}>{product.category_name}</td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{product.category_name}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {product.variants.length === 0 ? (
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-slate-500">
                         Belum ada varian
                       </span>
                     ) : (
@@ -513,19 +512,19 @@ function ProductsTable({ products }: { products: ProductView[] }) {
                         {product.variants.map((variant) => (
                           <li
                             key={variant.id}
-                            className="rounded-lg border border-zinc-200 p-3"
+                            className="rounded-lg border border-slate-200 p-3"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div>
                                 <p className="font-medium">{variant.name}</p>
-                                <p className="mt-0.5 text-xs text-zinc-500">
+                                <p className="mt-0.5 text-xs text-slate-500">
                                   {variant.barcode
                                     ? `Barcode ${variant.barcode} · `
                                     : ""}
                                   Satuan {variant.unit_name} · Harga{" "}
                                   {formatRupiah(variant.default_selling_price)}
                                 </p>
-                                <p className="mt-0.5 text-xs text-zinc-500">
+                                <p className="mt-0.5 text-xs text-slate-500">
                                   Stok {formatNumber(variant.stock_qty, 4)} ·
                                   Rusak{" "}
                                   {formatNumber(variant.damaged_stock_qty, 4)} ·
@@ -543,15 +542,15 @@ function ProductsTable({ products }: { products: ProductView[] }) {
                             </div>
                             <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
                               <div>
-                                <p className="font-medium text-zinc-700">
+                                <p className="font-medium text-slate-700">
                                   Harga kanal
                                 </p>
                                 {variant.channel_prices.length === 0 ? (
-                                  <p className="text-zinc-500">
+                                  <p className="text-slate-500">
                                     Belum diatur
                                   </p>
                                 ) : (
-                                  <ul className="mt-1 space-y-0.5 text-zinc-600">
+                                  <ul className="mt-1 space-y-0.5 text-slate-600">
                                     {variant.channel_prices.map((price) => (
                                       <li key={price.id}>
                                         {price.channel_name}:{" "}
@@ -562,15 +561,15 @@ function ProductsTable({ products }: { products: ProductView[] }) {
                                 )}
                               </div>
                               <div>
-                                <p className="font-medium text-zinc-700">
+                                <p className="font-medium text-slate-700">
                                   Harga beli supplier
                                 </p>
                                 {variant.supplier_prices.length === 0 ? (
-                                  <p className="text-zinc-500">
+                                  <p className="text-slate-500">
                                     Belum diatur
                                   </p>
                                 ) : (
-                                  <ul className="mt-1 space-y-0.5 text-zinc-600">
+                                  <ul className="mt-1 space-y-0.5 text-slate-600">
                                     {variant.supplier_prices.map((price) => (
                                       <li key={price.id}>
                                         {price.supplier_name}:{" "}
@@ -585,19 +584,18 @@ function ProductsTable({ products }: { products: ProductView[] }) {
                         ))}
                       </ul>
                     )}
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <ToggleForm
                       action={toggleProductActiveAction}
                       id={product.id}
                       active={product.is_active}
                     />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </Panel>
   );
@@ -633,40 +631,38 @@ export function ProductsManager({
         title="Daftar Kategori"
         description="Nonaktifkan kategori untuk menyembunyikannya dari pilihan."
       >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-zinc-200">
-            <thead>
-              <tr>
-                <th className={thClass}>Nama</th>
-                <th className={thClass}>Status</th>
-                <th className={thClass}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {categories.map((category) => (
-                <tr key={category.id}>
-                  <td className={tdClass}>{category.name}</td>
-                  <td className={tdClass}>
+        <Table className="min-w-full divide-y divide-slate-200">
+          <TableHeader>
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nama</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
+            {categories.map((category) => (
+              <TableRow key={category.id} className="hover:bg-teal-50/40">
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{category.name}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <ToggleForm
                       action={toggleCategoryActiveAction}
                       id={category.id}
                       active={category.is_active}
                     />
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {category.product_count === 0 ? (
                       <CategoryDeleteButton categoryId={category.id} />
                     ) : (
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-slate-500">
                         Digunakan {category.product_count} produk
                       </span>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </Panel>
 
       <ProductsTable products={products} />

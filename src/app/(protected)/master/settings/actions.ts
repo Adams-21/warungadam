@@ -3,10 +3,10 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { toActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { optionalTextSchema, uuidSchema } from "@/lib/schemas";
 
@@ -51,28 +51,28 @@ export async function updateBusinessSettingsAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = settingsSchema.safeParse({
-    id: String(formData.get("id") ?? ""),
-    business_name: formData.get("business_name"),
-    address: formData.get("address"),
-    phone: formData.get("phone"),
-    default_admin_fee_rate: String(
-      formData.get("default_admin_fee_rate") ?? "",
-    ),
-    session_timeout_minutes: String(
-      formData.get("session_timeout_minutes") ?? "",
-    ),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-  const validId = uuidSchema.safeParse(parsed.data.id);
-  const targetId = validId.success ? validId.data : randomUUID();
-
   try {
+    const parsed = settingsSchema.safeParse({
+      id: String(formData.get("id") ?? ""),
+      business_name: formData.get("business_name"),
+      address: formData.get("address"),
+      phone: formData.get("phone"),
+      default_admin_fee_rate: String(
+        formData.get("default_admin_fee_rate") ?? "",
+      ),
+      session_timeout_minutes: String(
+        formData.get("session_timeout_minutes") ?? "",
+      ),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+    const validId = uuidSchema.safeParse(parsed.data.id);
+    const targetId = validId.success ? validId.data : randomUUID();
+
     const saved = await prisma.$transaction(async (tx) => {
       const existing = await tx.businessSettings.findUnique({
         where: { id: targetId },
@@ -117,7 +117,7 @@ export async function updateBusinessSettingsAction(
     revalidateSettingsPaths();
     return { success: `Pengaturan ${saved.business_name} tersimpan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan pengaturan bisnis.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -125,15 +125,15 @@ export async function createSalesChannelAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = namedSchema.safeParse({ name: formData.get("name") });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = namedSchema.safeParse({ name: formData.get("name") });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const channel = await prisma.$transaction(async (tx) => {
       const created = await tx.salesChannels.create({
         data: {
@@ -151,50 +151,59 @@ export async function createSalesChannelAction(
     revalidateSettingsPaths();
     return { success: `Kanal ${channel.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menambah kanal penjualan.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function toggleSalesChannelActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID kanal penjualan tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.salesChannels.findUnique({
-    where: { id: parsedId.data },
-    select: { is_active: true },
-  });
-  if (!existing) return;
-
-  const nextValue = !existing.is_active;
-  await prisma.$transaction(async (tx) => {
-    await tx.salesChannels.update({
+    const user = await requireAuth();
+    const existing = await prisma.salesChannels.findUnique({
       where: { id: parsedId.data },
-      data: { is_active: nextValue },
+      select: { is_active: true },
     });
-    await logActivity(tx, user.id, "SalesChannels", parsedId.data, "UPDATE", {
-      is_active: nextValue,
-    });
-  });
+    if (!existing) {
+      return { error: "Kanal penjualan tidak ditemukan." };
+    }
 
-  revalidateSettingsPaths();
+    const nextValue = !existing.is_active;
+    await prisma.$transaction(async (tx) => {
+      await tx.salesChannels.update({
+        where: { id: parsedId.data },
+        data: { is_active: nextValue },
+      });
+      await logActivity(tx, user.id, "SalesChannels", parsedId.data, "UPDATE", {
+        is_active: nextValue,
+      });
+    });
+
+    revalidateSettingsPaths();
+    return { success: "Status kanal penjualan berhasil diubah." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }
 
 export async function createExpenseCategoryAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = namedSchema.safeParse({ name: formData.get("name") });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = namedSchema.safeParse({ name: formData.get("name") });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const category = await prisma.$transaction(async (tx) => {
       const created = await tx.expenseCategories.create({
         data: { name: parsed.data.name },
@@ -208,38 +217,47 @@ export async function createExpenseCategoryAction(
     revalidateSettingsPaths();
     return { success: `Kategori ${category.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menambah kategori pengeluaran.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function toggleExpenseCategoryActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID kategori pengeluaran tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.expenseCategories.findUnique({
-    where: { id: parsedId.data },
-    select: { is_active: true },
-  });
-  if (!existing) return;
-
-  const nextValue = !existing.is_active;
-  await prisma.$transaction(async (tx) => {
-    await tx.expenseCategories.update({
+    const user = await requireAuth();
+    const existing = await prisma.expenseCategories.findUnique({
       where: { id: parsedId.data },
-      data: { is_active: nextValue },
+      select: { is_active: true },
     });
-    await logActivity(
-      tx,
-      user.id,
-      "ExpenseCategories",
-      parsedId.data,
-      "UPDATE",
-      { is_active: nextValue },
-    );
-  });
+    if (!existing) {
+      return { error: "Kategori pengeluaran tidak ditemukan." };
+    }
 
-  revalidateSettingsPaths();
+    const nextValue = !existing.is_active;
+    await prisma.$transaction(async (tx) => {
+      await tx.expenseCategories.update({
+        where: { id: parsedId.data },
+        data: { is_active: nextValue },
+      });
+      await logActivity(
+        tx,
+        user.id,
+        "ExpenseCategories",
+        parsedId.data,
+        "UPDATE",
+        { is_active: nextValue },
+      );
+    });
+
+    revalidateSettingsPaths();
+    return { success: "Status kategori pengeluaran berhasil diubah." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }

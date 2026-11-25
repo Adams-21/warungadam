@@ -5,6 +5,12 @@ import {
   PageHeading,
   Panel,
   StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
 } from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
@@ -136,9 +142,6 @@ export default async function PurchaseDetailPage({
     purchase.remaining_amount > BigInt(0);
   const today = new Date().toISOString().slice(0, 10);
 
-  const thClass =
-    "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-  const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
   return (
     <>
@@ -156,24 +159,24 @@ export default async function PurchaseDetailPage({
       <Panel title="Ringkasan Pesanan">
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Supplier
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">{detail.supplier_name}</dd>
+            <dd className="mt-1 text-sm text-slate-900">{detail.supplier_name}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Tanggal Pesanan
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
+            <dd className="mt-1 text-sm text-slate-900">
               {new Date(detail.purchase_date).toLocaleDateString("id-ID")}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Tipe Pembayaran
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
+            <dd className="mt-1 text-sm text-slate-900">
               {paymentTypeLabel(detail.payment_type)}
               {detail.due_date
                 ? ` · ${new Date(detail.due_date).toLocaleDateString("id-ID")}`
@@ -181,7 +184,7 @@ export default async function PurchaseDetailPage({
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Status
             </dt>
             <dd className="mt-1 flex flex-wrap gap-2">
@@ -194,73 +197,73 @@ export default async function PurchaseDetailPage({
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Total Pesanan
             </dt>
-            <dd className="mt-1 text-sm font-medium text-zinc-900">
+            <dd className="mt-1 text-sm font-medium text-slate-900">
               {formatRupiah(detail.total_amount)}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Sudah Dibayar
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
+            <dd className="mt-1 text-sm text-slate-900">
               {formatRupiah(detail.paid_amount)}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Sisa Tagihan
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
+            <dd className="mt-1 text-sm text-slate-900">
               {formatRupiah(detail.remaining_amount)}
             </dd>
           </div>
           {detail.notes ? (
             <div className="sm:col-span-2 lg:col-span-4">
-              <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
                 Catatan
               </dt>
-              <dd className="mt-1 text-sm text-zinc-900">{detail.notes}</dd>
+              <dd className="mt-1 text-sm text-slate-900">{detail.notes}</dd>
             </div>
           ) : null}
         </dl>
       </Panel>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-zinc-200">
-          <thead className="bg-zinc-50">
-            <tr>
-              <th className={thClass}>Varian Produk</th>
-              <th className={thClass}>Dipesan</th>
-              <th className={thClass}>Diterima</th>
-              <th className={thClass}>Sisa</th>
-              <th className={thClass}>Harga Satuan</th>
-              <th className={thClass}>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Varian Produk</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Dipesan</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Diterima</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Sisa</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Harga Satuan</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
             {itemViews.map((item) => (
-              <tr key={item.id}>
-                <td className={`${tdClass} font-medium`}>{item.variant_label}</td>
-                <td className={tdClass}>
+              <TableRow key={item.id} className="hover:bg-teal-50/40">
+                <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">{item.variant_label}</TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatNumber(item.ordered_qty, 4)} {item.unit_name}
-                </td>
-                <td className={tdClass}>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatNumber(item.received_qty, 4)} {item.unit_name}
-                </td>
-                <td className={tdClass}>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatNumber(item.remaining_qty, 4)} {item.unit_name}
-                </td>
-                <td className={tdClass}>{formatRupiah(item.unit_price)}</td>
-                <td className={tdClass}>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.unit_price)}</TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatRupiah(Math.round(item.subtotal))}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -299,15 +302,15 @@ export default async function PurchaseDetailPage({
               {goodsReceiptViews.map((receipt) => (
                 <div
                   key={receipt.id}
-                  className="rounded-lg border border-zinc-200 p-3"
+                  className="rounded-lg border border-slate-200 p-3"
                 >
-                  <p className="text-sm font-medium text-zinc-900">
+                  <p className="text-sm font-medium text-slate-900">
                     {receipt.receipt_number}
                   </p>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     {new Date(receipt.received_at).toLocaleString("id-ID")}
                   </p>
-                  <ul className="mt-2 space-y-1 text-sm text-zinc-700">
+                  <ul className="mt-2 space-y-1 text-sm text-slate-700">
                     {receipt.items.map((item, index) => (
                       <li key={`${receipt.id}-${index}`}>
                         {item.variant_label}: {formatNumber(item.qty, 4)}{" "}
@@ -316,7 +319,7 @@ export default async function PurchaseDetailPage({
                     ))}
                   </ul>
                   {receipt.notes ? (
-                    <p className="mt-2 text-xs text-zinc-500">{receipt.notes}</p>
+                    <p className="mt-2 text-xs text-slate-500">{receipt.notes}</p>
                   ) : null}
                 </div>
               ))}
@@ -332,13 +335,13 @@ export default async function PurchaseDetailPage({
               {supplierPaymentViews.map((payment) => (
                 <div
                   key={payment.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-200 p-3"
+                  className="flex items-center justify-between rounded-lg border border-slate-200 p-3"
                 >
                   <div>
-                    <p className="text-sm font-medium text-zinc-900">
+                    <p className="text-sm font-medium text-slate-900">
                       {formatRupiah(payment.amount)}
                     </p>
-                    <p className="mt-1 text-xs text-zinc-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       {new Date(payment.payment_date).toLocaleDateString("id-ID")} ·{" "}
                       {payment.payment_method}
                       {payment.is_void ? " · Dibatalkan" : ""}

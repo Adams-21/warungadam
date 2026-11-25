@@ -3,10 +3,11 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { priceSchema, uuidSchema } from "@/lib/schemas";
 import {
@@ -83,20 +84,20 @@ export async function createExpenseAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = expenseInputSchema.safeParse({
-    expense_category_id: formData.get("expense_category_id"),
-    expense_date: parseDateInput(formData.get("expense_date")),
-    amount: formData.get("amount"),
-    description: formData.get("description"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = expenseInputSchema.safeParse({
+      expense_category_id: formData.get("expense_category_id"),
+      expense_date: parseDateInput(formData.get("expense_date")),
+      amount: formData.get("amount"),
+      description: formData.get("description"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     await prisma.$transaction(async (tx) => {
       const validationError = validateExpenseInput(parsed.data, {
         validCategoryIds: await activeCategoryIds(tx),
@@ -116,7 +117,7 @@ export async function createExpenseAction(
     revalidateExpensePaths();
     return { success: "Pengeluaran operasional berhasil dicatat." };
   } catch (error) {
-    return toActionError(error, "Gagal mencatat pengeluaran operasional.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -124,22 +125,22 @@ export async function correctExpenseAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = correctionSchema.safeParse({
-    id: formData.get("id"),
-    expense_category_id: formData.get("expense_category_id"),
-    expense_date: parseDateInput(formData.get("expense_date")),
-    amount: formData.get("amount"),
-    description: formData.get("description"),
-    reason: formData.get("reason"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = correctionSchema.safeParse({
+      id: formData.get("id"),
+      expense_category_id: formData.get("expense_category_id"),
+      expense_date: parseDateInput(formData.get("expense_date")),
+      amount: formData.get("amount"),
+      description: formData.get("description"),
+      reason: formData.get("reason"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     await prisma.$transaction(async (tx) => {
       const existing = await tx.expenses.findUnique({
         where: { id: parsed.data.id },
@@ -197,7 +198,7 @@ export async function correctExpenseAction(
         "Pengeluaran berhasil dikoreksi; data lama tetap tersimpan sebagai riwayat.",
     };
   } catch (error) {
-    return toActionError(error, "Gagal mengoreksi pengeluaran.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -205,21 +206,21 @@ export async function voidExpenseAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = voidSchema.safeParse({
-    id: formData.get("id"),
-    reason: formData.get("reason"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const reasonError = validateExpenseVoidReason(parsed.data.reason);
-  if (reasonError) return { error: reasonError };
-
-  const user = await requireAuth();
-
   try {
+    const parsed = voidSchema.safeParse({
+      id: formData.get("id"),
+      reason: formData.get("reason"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const reasonError = validateExpenseVoidReason(parsed.data.reason);
+    if (reasonError) return { error: reasonError };
+
+    const user = await requireAuth();
+
     await prisma.$transaction(async (tx) => {
       const existing = await tx.expenses.findUnique({
         where: { id: parsed.data.id },
@@ -254,7 +255,7 @@ export async function voidExpenseAction(
     revalidateExpensePaths();
     return { success: "Pengeluaran dibatalkan dan tidak dihitung lagi." };
   } catch (error) {
-    return toActionError(error, "Gagal membatalkan pengeluaran.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -262,18 +263,18 @@ export async function createExpenseCategoryAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = categoryNameSchema.safeParse({ name: formData.get("name") });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const nameError = validateExpenseCategoryName(parsed.data.name);
-  if (nameError) return { error: nameError };
-
-  const user = await requireAuth();
-
   try {
+    const parsed = categoryNameSchema.safeParse({ name: formData.get("name") });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const nameError = validateExpenseCategoryName(parsed.data.name);
+    if (nameError) return { error: nameError };
+
+    const user = await requireAuth();
+
     const category = await prisma.$transaction(async (tx) => {
       const existing = await tx.expenseCategories.findUnique({
         where: { name: parsed.data.name },
@@ -295,7 +296,7 @@ export async function createExpenseCategoryAction(
     revalidateExpensePaths();
     return { success: `Kategori ${category.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menambah kategori pengeluaran.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -303,21 +304,21 @@ export async function renameExpenseCategoryAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = categoryUpdateSchema.safeParse({
-    id: formData.get("id"),
-    name: formData.get("name"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const nameError = validateExpenseCategoryName(parsed.data.name);
-  if (nameError) return { error: nameError };
-
-  const user = await requireAuth();
-
   try {
+    const parsed = categoryUpdateSchema.safeParse({
+      id: formData.get("id"),
+      name: formData.get("name"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const nameError = validateExpenseCategoryName(parsed.data.name);
+    if (nameError) return { error: nameError };
+
+    const user = await requireAuth();
+
     await prisma.$transaction(async (tx) => {
       const existing = await tx.expenseCategories.findUnique({
         where: { id: parsed.data.id },
@@ -347,25 +348,27 @@ export async function renameExpenseCategoryAction(
     revalidateExpensePaths();
     return { success: `Kategori berhasil diubah menjadi ${parsed.data.name}.` };
   } catch (error) {
-    return toActionError(error, "Gagal mengubah kategori pengeluaran.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function toggleExpenseCategoryActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsed = categoryIdSchema.safeParse({ id: formData.get("id") });
-  if (!parsed.success) return;
-
-  const user = await requireAuth();
-
+): Promise<ActionState> {
   try {
-    await prisma.$transaction(async (tx) => {
+    const parsed = categoryIdSchema.safeParse({ id: formData.get("id") });
+    if (!parsed.success) {
+      return { error: "ID kategori pengeluaran tidak valid." };
+    }
+
+    const user = await requireAuth();
+
+    const updated = await prisma.$transaction(async (tx) => {
       const existing = await tx.expenseCategories.findUnique({
         where: { id: parsed.data.id },
         select: { id: true, is_active: true },
       });
-      if (!existing) return;
+      if (!existing) return false;
 
       const nextValue = !existing.is_active;
       await tx.expenseCategories.update({
@@ -380,10 +383,16 @@ export async function toggleExpenseCategoryActiveAction(
         "UPDATE",
         { is_active: nextValue },
       );
+      return true;
     });
 
+    if (!updated) {
+      return { error: "Kategori pengeluaran tidak ditemukan." };
+    }
+
     revalidateExpensePaths();
+    return { success: "Status kategori pengeluaran berhasil diubah." };
   } catch (error) {
-    console.error(error);
+    return { error: getErrorMessage(error) };
   }
 }

@@ -3,10 +3,11 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import {
   optionalTextSchema,
@@ -52,32 +53,32 @@ export async function createPackagingPurchaseAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const materialIds = formData.getAll("packaging_material_id");
-  const purchaseQtys = formData.getAll("purchase_qty");
-  const unitPrices = formData.getAll("unit_price");
-
-  const parsed = createPackagingPurchaseSchema.safeParse({
-    purchase_date: parseDateInput(formData.get("purchase_date")),
-    notes: formData.get("notes"),
-    items: materialIds.map((materialId, index) => ({
-      packaging_material_id: materialId,
-      purchase_qty: purchaseQtys[index],
-      unit_price: unitPrices[index],
-    })),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const ids = parsed.data.items.map((item) => item.packaging_material_id);
-  if (new Set(ids).size !== ids.length) {
-    return { error: "Material tidak boleh duplikat dalam satu pembelian." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const materialIds = formData.getAll("packaging_material_id");
+    const purchaseQtys = formData.getAll("purchase_qty");
+    const unitPrices = formData.getAll("unit_price");
+
+    const parsed = createPackagingPurchaseSchema.safeParse({
+      purchase_date: parseDateInput(formData.get("purchase_date")),
+      notes: formData.get("notes"),
+      items: materialIds.map((materialId, index) => ({
+        packaging_material_id: materialId,
+        purchase_qty: purchaseQtys[index],
+        unit_price: unitPrices[index],
+      })),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const ids = parsed.data.items.map((item) => item.packaging_material_id);
+    if (new Set(ids).size !== ids.length) {
+      return { error: "Material tidak boleh duplikat dalam satu pembelian." };
+    }
+
+    const user = await requireAuth();
+
     const materials = await prisma.packagingMaterials.findMany({
       where: { id: { in: ids }, is_active: true },
       select: {
@@ -217,6 +218,6 @@ export async function createPackagingPurchaseAction(
       success: `Pembelian kemasan ${purchase.purchase_number} berhasil dicatat.`,
     };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan pembelian kemasan.");
+    return { error: getErrorMessage(error) };
   }
 }

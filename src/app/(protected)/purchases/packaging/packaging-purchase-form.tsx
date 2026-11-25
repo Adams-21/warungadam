@@ -3,10 +3,19 @@
 import { useActionState, useRef, useState } from "react";
 import {
   ActionMessage,
+  Button,
+  Input,
+  Label,
   SubmitButton,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   secondaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { createPackagingPurchaseAction } from "./actions";
@@ -18,10 +27,6 @@ type ItemRow = {
   purchase_qty: string;
   unit_price: string;
 };
-
-const thClass =
-  "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
 export function PackagingPurchaseForm({
   materials,
@@ -79,45 +84,45 @@ export function PackagingPurchaseForm({
     <form action={formAction} className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label htmlFor="packaging_purchase_date" className="text-sm font-medium">
+          <Label htmlFor="packaging_purchase_date" className="text-sm font-medium">
             Tanggal pembelian
-          </label>
-          <input
+          </Label>
+          <Input
             id="packaging_purchase_date"
             name="purchase_date"
             type="date"
             required
             defaultValue={today}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div>
-          <label htmlFor="packaging_notes" className="text-sm font-medium">
+          <Label htmlFor="packaging_notes" className="text-sm font-medium">
             Catatan
-          </label>
-          <input
+          </Label>
+          <Input
             id="packaging_notes"
             name="notes"
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
             placeholder="Opsional"
           />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-zinc-200">
-        <table className="min-w-full divide-y divide-zinc-200">
-          <thead className="bg-zinc-50">
-            <tr>
-              <th className={thClass}>Material</th>
-              <th className={thClass}>Jumlah Beli</th>
-              <th className={thClass}>Satuan Beli</th>
-              <th className={thClass}>Harga Satuan</th>
-              <th className={thClass}>Konversi</th>
-              <th className={thClass}>Subtotal</th>
-              <th className={thClass}>Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Material</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jumlah Beli</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Satuan Beli</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Harga Satuan</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Konversi</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
             {rows.map((row) => {
               const material = materials.find(
                 (item) => item.id === row.packaging_material_id,
@@ -128,18 +133,18 @@ export function PackagingPurchaseForm({
                 Number.isFinite(qty) && Number.isFinite(price) ? qty * price : 0;
 
               return (
-                <tr key={row.key}>
-                  <td className={tdClass}>
-                    <select
+                <TableRow key={row.key} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <SelectField
                       name="packaging_material_id"
-                      required
-                      value={row.packaging_material_id}
-                      onChange={(event) =>
+                      defaultValue={row.packaging_material_id}
+                      className="mt-1 h-10 w-full bg-white"
+                      placeholder="Pilih material"
+                      onValueChange={(value) =>
                         updateRow(row.key, {
-                          packaging_material_id: event.target.value,
+                          packaging_material_id: value,
                         })
                       }
-                      className={inputClass}
                     >
                       <option value="" disabled>
                         Pilih material
@@ -149,10 +154,10 @@ export function PackagingPurchaseForm({
                           {item.name}
                         </option>
                       ))}
-                    </select>
-                  </td>
-                  <td className={tdClass}>
-                    <input
+                    </SelectField>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <Input
                       name="purchase_qty"
                       type="number"
                       min="0.0001"
@@ -162,14 +167,14 @@ export function PackagingPurchaseForm({
                       onChange={(event) =>
                         updateRow(row.key, { purchase_qty: event.target.value })
                       }
-                      className={inputClass}
+                      className="mt-1 h-10 bg-white"
                     />
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {material?.purchase_unit_name ?? "-"}
-                  </td>
-                  <td className={tdClass}>
-                    <input
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <Input
                       name="unit_price"
                       type="number"
                       min="0"
@@ -179,36 +184,36 @@ export function PackagingPurchaseForm({
                       onChange={(event) =>
                         updateRow(row.key, { unit_price: event.target.value })
                       }
-                      className={inputClass}
+                      className="mt-1 h-10 bg-white"
                     />
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {material
                       ? `${formatNumber(material.conversion_factor, 4)} ${material.usage_unit_name}`
                       : "-"}
-                  </td>
-                  <td className={tdClass}>{formatRupiah(Math.round(subtotal))}</td>
-                  <td className={tdClass}>
-                    <button
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(Math.round(subtotal))}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <Button
                       type="button"
                       onClick={() => removeRow(row.key)}
-                      className="text-sm font-medium text-red-700 hover:underline"
+                      className="text-sm font-medium text-rose-700 hover:underline"
                     >
                       Hapus
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={addRow} className={secondaryButtonClass}>
+          <Button type="button" onClick={addRow} className={secondaryButtonClass}>
             Tambah Material
-          </button>
+          </Button>
           <span className="text-sm font-medium">
             Total: {formatRupiah(Math.round(estimatedTotal))}
           </span>

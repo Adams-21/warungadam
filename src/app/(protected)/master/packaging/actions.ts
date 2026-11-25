@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { toActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import {
   nullableDecimalSchema,
@@ -53,21 +53,21 @@ export async function createMaterialAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = materialSchema.safeParse({
-    name: formData.get("name"),
-    purchase_unit_id: formData.get("purchase_unit_id"),
-    usage_unit_id: formData.get("usage_unit_id"),
-    conversion_factor: formData.get("conversion_factor"),
-    min_stock: formData.get("min_stock"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = materialSchema.safeParse({
+      name: formData.get("name"),
+      purchase_unit_id: formData.get("purchase_unit_id"),
+      usage_unit_id: formData.get("usage_unit_id"),
+      conversion_factor: formData.get("conversion_factor"),
+      min_stock: formData.get("min_stock"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const material = await prisma.$transaction(async (tx) => {
       const created = await tx.packagingMaterials.create({
         data: {
@@ -88,59 +88,68 @@ export async function createMaterialAction(
     revalidatePackagingPaths();
     return { success: `Material ${material.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menambah material kemasan.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function toggleMaterialActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID material kemasan tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.packagingMaterials.findUnique({
-    where: { id: parsedId.data },
-    select: { is_active: true },
-  });
-  if (!existing) return;
-
-  const nextValue = !existing.is_active;
-  await prisma.$transaction(async (tx) => {
-    await tx.packagingMaterials.update({
+    const user = await requireAuth();
+    const existing = await prisma.packagingMaterials.findUnique({
       where: { id: parsedId.data },
-      data: { is_active: nextValue },
+      select: { is_active: true },
     });
-    await logActivity(
-      tx,
-      user.id,
-      "PackagingMaterials",
-      parsedId.data,
-      "UPDATE",
-      { is_active: nextValue },
-    );
-  });
+    if (!existing) {
+      return { error: "Material kemasan tidak ditemukan." };
+    }
 
-  revalidatePackagingPaths();
+    const nextValue = !existing.is_active;
+    await prisma.$transaction(async (tx) => {
+      await tx.packagingMaterials.update({
+        where: { id: parsedId.data },
+        data: { is_active: nextValue },
+      });
+      await logActivity(
+        tx,
+        user.id,
+        "PackagingMaterials",
+        parsedId.data,
+        "UPDATE",
+        { is_active: nextValue },
+      );
+    });
+
+    revalidatePackagingPaths();
+    return { success: "Status material kemasan berhasil diubah." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }
 
 export async function createPackageSizeAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = packageSizeSchema.safeParse({
-    name: formData.get("name"),
-    dimension_label: formData.get("dimension_label"),
-    sort_order: String(formData.get("sort_order") ?? "0"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = packageSizeSchema.safeParse({
+      name: formData.get("name"),
+      dimension_label: formData.get("dimension_label"),
+      sort_order: String(formData.get("sort_order") ?? "0"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const size = await prisma.$transaction(async (tx) => {
       const created = await tx.packageSizes.create({
         data: {
@@ -159,66 +168,75 @@ export async function createPackageSizeAction(
     revalidatePackagingPaths();
     return { success: `Ukuran ${size.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menambah ukuran paket.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function togglePackageSizeActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID ukuran paket tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.packageSizes.findUnique({
-    where: { id: parsedId.data },
-    select: { is_active: true },
-  });
-  if (!existing) return;
-
-  const nextValue = !existing.is_active;
-  await prisma.$transaction(async (tx) => {
-    await tx.packageSizes.update({
+    const user = await requireAuth();
+    const existing = await prisma.packageSizes.findUnique({
       where: { id: parsedId.data },
-      data: { is_active: nextValue },
+      select: { is_active: true },
     });
-    await logActivity(tx, user.id, "PackageSizes", parsedId.data, "UPDATE", {
-      is_active: nextValue,
-    });
-  });
+    if (!existing) {
+      return { error: "Ukuran paket tidak ditemukan." };
+    }
 
-  revalidatePackagingPaths();
+    const nextValue = !existing.is_active;
+    await prisma.$transaction(async (tx) => {
+      await tx.packageSizes.update({
+        where: { id: parsedId.data },
+        data: { is_active: nextValue },
+      });
+      await logActivity(tx, user.id, "PackageSizes", parsedId.data, "UPDATE", {
+        is_active: nextValue,
+      });
+    });
+
+    revalidatePackagingPaths();
+    return { success: "Status ukuran paket berhasil diubah." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }
 
 export async function deletePackageSizeAction(
   packageSizeId: string,
 ): Promise<ActionState> {
-  const parsedId = uuidSchema.safeParse(packageSizeId);
-  if (!parsedId.success) {
-    return { error: "ID ukuran paket tidak valid." };
-  }
-
-  const user = await requireAuth();
-  const [size, salesCount] = await Promise.all([
-    prisma.packageSizes.findUnique({
-      where: { id: parsedId.data },
-      select: { id: true, name: true },
-    }),
-    prisma.sales.count({ where: { package_size_id: parsedId.data } }),
-  ]);
-
-  if (!size) {
-    return { error: "Ukuran paket tidak ditemukan." };
-  }
-
-  if (getBlockingRelations("PACKAGE_SIZE", { sales: salesCount }).length > 0) {
-    return {
-      error:
-        "Ukuran paket sudah dipakai transaksi dan hanya bisa dinonaktifkan.",
-    };
-  }
-
   try {
+    const parsedId = uuidSchema.safeParse(packageSizeId);
+    if (!parsedId.success) {
+      return { error: "ID ukuran paket tidak valid." };
+    }
+
+    const user = await requireAuth();
+    const [size, salesCount] = await Promise.all([
+      prisma.packageSizes.findUnique({
+        where: { id: parsedId.data },
+        select: { id: true, name: true },
+      }),
+      prisma.sales.count({ where: { package_size_id: parsedId.data } }),
+    ]);
+
+    if (!size) {
+      return { error: "Ukuran paket tidak ditemukan." };
+    }
+
+    if (getBlockingRelations("PACKAGE_SIZE", { sales: salesCount }).length > 0) {
+      return {
+        error:
+          "Ukuran paket sudah dipakai transaksi dan hanya bisa dinonaktifkan.",
+      };
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.packageSizeItems.deleteMany({
         where: { package_size_id: parsedId.data },
@@ -232,7 +250,7 @@ export async function deletePackageSizeAction(
     revalidatePath("/master/packaging");
     return { success: `Ukuran ${size.name} berhasil dihapus.` };
   } catch (error) {
-    return toActionError(error, "Gagal menghapus ukuran paket.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -240,21 +258,21 @@ export async function upsertPackageItemAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = packageItemSchema.safeParse({
-    package_size_id: formData.get("package_size_id"),
-    packaging_material_id: formData.get("packaging_material_id"),
-    default_usage_qty: formData.get("default_usage_qty"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-  const { package_size_id, packaging_material_id, default_usage_qty } =
-    parsed.data;
-
   try {
+    const parsed = packageItemSchema.safeParse({
+      package_size_id: formData.get("package_size_id"),
+      packaging_material_id: formData.get("packaging_material_id"),
+      default_usage_qty: formData.get("default_usage_qty"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+    const { package_size_id, packaging_material_id, default_usage_qty } =
+      parsed.data;
+
     const item = await prisma.$transaction(async (tx) => {
       const existing = await tx.packageSizeItems.findUnique({
         where: {
@@ -300,34 +318,43 @@ export async function upsertPackageItemAction(
     revalidatePackagingPaths();
     return { success: `Komposisi berhasil disimpan (${item.id.slice(0, 8)}).` };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan komposisi paket.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function deletePackageItemAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID komposisi kemasan tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.packageSizeItems.findUnique({
-    where: { id: parsedId.data },
-    select: { id: true, package_size_id: true },
-  });
-  if (!existing) return;
+    const user = await requireAuth();
+    const existing = await prisma.packageSizeItems.findUnique({
+      where: { id: parsedId.data },
+      select: { id: true, package_size_id: true },
+    });
+    if (!existing) {
+      return { error: "Komposisi kemasan tidak ditemukan." };
+    }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.packageSizeItems.delete({ where: { id: parsedId.data } });
-    await logActivity(
-      tx,
-      user.id,
-      "PackageSizeItems",
-      parsedId.data,
-      "DELETE",
-      { package_size_id: existing.package_size_id },
-    );
-  });
+    await prisma.$transaction(async (tx) => {
+      await tx.packageSizeItems.delete({ where: { id: parsedId.data } });
+      await logActivity(
+        tx,
+        user.id,
+        "PackageSizeItems",
+        parsedId.data,
+        "DELETE",
+        { package_size_id: existing.package_size_id },
+      );
+    });
 
-  revalidatePackagingPaths();
+    revalidatePackagingPaths();
+    return { success: "Komposisi kemasan berhasil dihapus." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }

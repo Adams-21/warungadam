@@ -1,15 +1,24 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import {
+  Button,
   DateRangeFields,
   EmptyState,
+  Input,
+  Label,
   PageHeading,
   Panel,
   StatusBadge,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import {
@@ -142,9 +151,6 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const totalProductCogs = aggregated.totalProductCogs;
   const totalPackagingCogs = aggregated.totalPackagingCogs;
   const totalCogs = totalProductCogs + totalPackagingCogs;
-  const thClass =
-    "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-  const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
   return (
     <>
@@ -160,26 +166,26 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Panel title="Jumlah Transaksi">
-          <p className="text-2xl font-semibold text-zinc-900">
+          <p className="text-2xl font-semibold text-slate-900">
             {saleViews.length}
           </p>
         </Panel>
         <Panel title="Penjualan Bruto">
-          <p className="text-xl font-semibold text-zinc-900">
+          <p className="text-xl font-semibold text-slate-900">
             {formatRupiah(Number(totalRevenue))}
           </p>
         </Panel>
         <Panel title="Total HPP">
-          <p className="text-xl font-semibold text-zinc-900">
+          <p className="text-xl font-semibold text-slate-900">
             {formatRupiah(Number(totalCogs))}
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-slate-500">
             Produk {formatRupiah(Number(totalProductCogs))} · Kemasan{" "}
             {formatRupiah(Number(totalPackagingCogs))}
           </p>
         </Panel>
         <Panel title="Laba Kotor">
-          <p className="text-xl font-semibold text-zinc-900">
+          <p className="text-xl font-semibold text-slate-900">
             {formatRupiah(Number(totalRevenue - totalCogs))}
           </p>
         </Panel>
@@ -192,26 +198,26 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         >
           <form method="get" className="grid gap-3 md:grid-cols-5">
             <div>
-              <label htmlFor="q" className="text-sm font-medium">
+              <Label htmlFor="q" className="text-sm font-medium">
                 Pencarian
-              </label>
-              <input
+              </Label>
+              <Input
                 id="q"
                 name="q"
                 defaultValue={search}
                 placeholder="No. transaksi / resi"
-                className={inputClass}
+                className="mt-1 h-10 bg-white"
               />
             </div>
             <div>
-              <label htmlFor="sales_channel_id" className="text-sm font-medium">
+              <Label htmlFor="sales_channel_id" className="text-sm font-medium">
                 Kanal
-              </label>
-              <select
-                id="sales_channel_id"
+              </Label>
+              <SelectField
                 name="sales_channel_id"
                 defaultValue={channelRaw}
-                className={inputClass}
+                id="sales_channel_id"
+                className="mt-1 h-10 w-full bg-white"
               >
                 <option value="">Semua kanal</option>
                 {channels.map((channel) => (
@@ -219,17 +225,17 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
                     {channel.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
             <div>
-              <label htmlFor="status" className="text-sm font-medium">
+              <Label htmlFor="status" className="text-sm font-medium">
                 Status pesanan
-              </label>
-              <select
-                id="status"
+              </Label>
+              <SelectField
                 name="status"
                 defaultValue={status}
-                className={inputClass}
+                id="status"
+                className="mt-1 h-10 w-full bg-white"
               >
                 <option value="">Semua status</option>
                 {SALE_ORDER_STATUSES.map((value) => (
@@ -237,75 +243,100 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
                     {saleOrderStatusLabel(value)}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
             <DateRangeFields from={dateFrom} to={dateTo} />
             <div className="flex items-end">
-              <button type="submit" className={secondaryButtonClass}>
+              <Button type="submit" className={secondaryButtonClass}>
                 Filter
-              </button>
+              </Button>
             </div>
           </form>
         </Panel>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-zinc-200">
-          <thead className="bg-zinc-50">
-            <tr>
-              <th className={thClass}>No. Transaksi</th>
-              <th className={thClass}>Tanggal</th>
-              <th className={thClass}>Kanal</th>
-              <th className={thClass}>Total</th>
-              <th className={thClass}>HPP Produk</th>
-              <th className={thClass}>HPP Kemasan</th>
-              <th className={thClass}>Laba Kotor</th>
-              <th className={thClass}>Status</th>
-              <th className={thClass}>Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                No. Transaksi
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tanggal
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Kanal
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Total
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                HPP Produk
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                HPP Kemasan
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Laba Kotor
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Status
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Aksi
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
             {saleViews.length === 0 ? (
-              <tr>
-                <td className={tdClass} colSpan={9}>
+              <TableRow className="hover:bg-teal-50/40">
+                <TableCell
+                  className="px-3 py-3 align-top text-sm text-slate-800"
+                  colSpan={9}
+                >
                   <EmptyState
                     compact
                     title="Belum ada transaksi"
                     description="Belum ada transaksi yang cocok dengan filter."
                   />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               saleViews.map((sale) => (
-                <tr key={sale.id}>
-                  <td className={`${tdClass} font-medium`}>
+                <TableRow key={sale.id} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                     {sale.transaction_number}
                     {sale.external_order_number ? (
-                      <span className="mt-1 block text-xs text-zinc-500">
+                      <span className="mt-1 block text-xs text-slate-500">
                         {sale.external_order_number}
                       </span>
                     ) : null}
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {new Date(sale.transaction_date).toLocaleDateString("id-ID")}
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {sale.channel_name}
                     {sale.package_size_name ? (
-                      <span className="mt-1 block text-xs text-zinc-500">
+                      <span className="mt-1 block text-xs text-slate-500">
                         Paket {sale.package_size_name}
                       </span>
                     ) : null}
-                  </td>
-                  <td className={tdClass}>{formatRupiah(sale.total_amount)}</td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    {formatRupiah(sale.total_amount)}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {formatRupiah(sale.product_cogs)}
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {formatRupiah(sale.packaging_cogs)}
-                  </td>
-                  <td className={tdClass}>{formatRupiah(sale.gross_profit)}</td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    {formatRupiah(sale.gross_profit)}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <div className="flex flex-wrap gap-1">
                       <StatusBadge status={sale.order_status}>
                         {saleOrderStatusLabel(sale.order_status)}
@@ -317,20 +348,20 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
                         {saleSettlementStatusLabel(sale.settlement_status)}
                       </StatusBadge>
                     </div>
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <Link
                       href={`/sales/${sale.id}`}
-                      className="font-medium text-zinc-900 underline"
+                      className="font-medium text-slate-900 underline"
                     >
                       Detail
                     </Link>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </>
   );

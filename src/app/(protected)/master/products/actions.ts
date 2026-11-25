@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { toActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import {
   nullableDecimalSchema,
@@ -58,7 +58,6 @@ const supplierPriceSchema = z.object({
   ),
 });
 
-const MUTATION_ERROR = "Gagal menyimpan data produk.";
 const REVALIDATE_PATHS = ["/master/products", "/dashboard"];
 
 function revalidateProductPaths() {
@@ -71,17 +70,17 @@ export async function createCategoryAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = categorySchema.safeParse({
-    name: formData.get("name"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = categorySchema.safeParse({
+      name: formData.get("name"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const category = await prisma.$transaction(async (tx) => {
       const created = await tx.productCategories.create({
         data: { name: parsed.data.name },
@@ -100,62 +99,71 @@ export async function createCategoryAction(
     revalidateProductPaths();
     return { success: `Kategori ${category.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menambah kategori.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function toggleCategoryActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID kategori tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.productCategories.findUnique({
-    where: { id: parsedId.data },
-    select: { is_active: true },
-  });
-  if (!existing) return;
-
-  const nextValue = !existing.is_active;
-  await prisma.$transaction(async (tx) => {
-    await tx.productCategories.update({
+    const user = await requireAuth();
+    const existing = await prisma.productCategories.findUnique({
       where: { id: parsedId.data },
-      data: { is_active: nextValue },
+      select: { is_active: true },
     });
-    await logActivity(
-      tx,
-      user.id,
-      "ProductCategories",
-      parsedId.data,
-      "UPDATE",
-      { is_active: nextValue },
-    );
-  });
+    if (!existing) {
+      return { error: "Kategori tidak ditemukan." };
+    }
 
-  revalidateProductPaths();
+    const nextValue = !existing.is_active;
+    await prisma.$transaction(async (tx) => {
+      await tx.productCategories.update({
+        where: { id: parsedId.data },
+        data: { is_active: nextValue },
+      });
+      await logActivity(
+        tx,
+        user.id,
+        "ProductCategories",
+        parsedId.data,
+        "UPDATE",
+        { is_active: nextValue },
+      );
+    });
+
+    revalidateProductPaths();
+    return { success: "Status kategori produk berhasil diubah." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }
 
 export async function deleteCategoryAction(
   categoryId: string,
 ): Promise<ActionState> {
-  const parsedId = uuidSchema.safeParse(categoryId);
-  if (!parsedId.success) {
-    return { error: "ID kategori tidak valid." };
-  }
-
-  const user = await requireAuth();
-  const productCount = await prisma.products.count({
-    where: { category_id: parsedId.data },
-  });
-
-  if (getBlockingRelations("CATEGORY", { products: productCount }).length > 0) {
-    return {
-      error: "Kategori masih digunakan produk dan tidak dapat dihapus.",
-    };
-  }
-
   try {
+    const parsedId = uuidSchema.safeParse(categoryId);
+    if (!parsedId.success) {
+      return { error: "ID kategori tidak valid." };
+    }
+
+    const user = await requireAuth();
+    const productCount = await prisma.products.count({
+      where: { category_id: parsedId.data },
+    });
+
+    if (getBlockingRelations("CATEGORY", { products: productCount }).length > 0) {
+      return {
+        error: "Kategori masih digunakan produk dan tidak dapat dihapus.",
+      };
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.productCategories.delete({ where: { id: parsedId.data } });
       await logActivity(
@@ -171,7 +179,7 @@ export async function deleteCategoryAction(
     revalidatePath("/master/products");
     return { success: "Kategori berhasil dihapus." };
   } catch (error) {
-    return toActionError(error, "Gagal menghapus kategori.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -179,19 +187,19 @@ export async function createProductAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = productSchema.safeParse({
-    name: formData.get("name"),
-    category_id: formData.get("category_id"),
-    description: formData.get("description"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = productSchema.safeParse({
+      name: formData.get("name"),
+      category_id: formData.get("category_id"),
+      description: formData.get("description"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const product = await prisma.$transaction(async (tx) => {
       const created = await tx.products.create({
         data: {
@@ -210,57 +218,66 @@ export async function createProductAction(
     revalidateProductPaths();
     return { success: `Produk ${product.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, MUTATION_ERROR);
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function toggleProductActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID produk tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.products.findUnique({
-    where: { id: parsedId.data },
-    select: { is_active: true },
-  });
-  if (!existing) return;
-
-  const nextValue = !existing.is_active;
-  await prisma.$transaction(async (tx) => {
-    await tx.products.update({
+    const user = await requireAuth();
+    const existing = await prisma.products.findUnique({
       where: { id: parsedId.data },
-      data: { is_active: nextValue },
+      select: { is_active: true },
     });
-    await logActivity(tx, user.id, "Products", parsedId.data, "UPDATE", {
-      is_active: nextValue,
-    });
-  });
+    if (!existing) {
+      return { error: "Produk tidak ditemukan." };
+    }
 
-  revalidateProductPaths();
+    const nextValue = !existing.is_active;
+    await prisma.$transaction(async (tx) => {
+      await tx.products.update({
+        where: { id: parsedId.data },
+        data: { is_active: nextValue },
+      });
+      await logActivity(tx, user.id, "Products", parsedId.data, "UPDATE", {
+        is_active: nextValue,
+      });
+    });
+
+    revalidateProductPaths();
+    return { success: "Status produk berhasil diubah." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }
 
 export async function createVariantAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = variantSchema.safeParse({
-    product_id: formData.get("product_id"),
-    unit_id: formData.get("unit_id"),
-    name: formData.get("name"),
-    barcode: formData.get("barcode"),
-    default_selling_price: String(formData.get("default_selling_price") ?? ""),
-    min_stock: formData.get("min_stock"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = variantSchema.safeParse({
+      product_id: formData.get("product_id"),
+      unit_id: formData.get("unit_id"),
+      name: formData.get("name"),
+      barcode: formData.get("barcode"),
+      default_selling_price: String(formData.get("default_selling_price") ?? ""),
+      min_stock: formData.get("min_stock"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     const variant = await prisma.$transaction(async (tx) => {
       const created = await tx.productVariants.create({
         data: {
@@ -283,55 +300,64 @@ export async function createVariantAction(
     revalidateProductPaths();
     return { success: `Varian ${variant.name} ditambahkan.` };
   } catch (error) {
-    return toActionError(error, "Gagal menambah varian.");
+    return { error: getErrorMessage(error) };
   }
 }
 
 export async function toggleVariantActiveAction(
   formData: FormData,
-): Promise<void> {
-  const parsedId = uuidSchema.safeParse(formData.get("id"));
-  if (!parsedId.success) return;
+): Promise<ActionState> {
+  try {
+    const parsedId = uuidSchema.safeParse(formData.get("id"));
+    if (!parsedId.success) {
+      return { error: "ID varian tidak valid." };
+    }
 
-  const user = await requireAuth();
-  const existing = await prisma.productVariants.findUnique({
-    where: { id: parsedId.data },
-    select: { is_active: true },
-  });
-  if (!existing) return;
-
-  const nextValue = !existing.is_active;
-  await prisma.$transaction(async (tx) => {
-    await tx.productVariants.update({
+    const user = await requireAuth();
+    const existing = await prisma.productVariants.findUnique({
       where: { id: parsedId.data },
-      data: { is_active: nextValue },
+      select: { is_active: true },
     });
-    await logActivity(tx, user.id, "ProductVariants", parsedId.data, "UPDATE", {
-      is_active: nextValue,
-    });
-  });
+    if (!existing) {
+      return { error: "Varian tidak ditemukan." };
+    }
 
-  revalidateProductPaths();
+    const nextValue = !existing.is_active;
+    await prisma.$transaction(async (tx) => {
+      await tx.productVariants.update({
+        where: { id: parsedId.data },
+        data: { is_active: nextValue },
+      });
+      await logActivity(tx, user.id, "ProductVariants", parsedId.data, "UPDATE", {
+        is_active: nextValue,
+      });
+    });
+
+    revalidateProductPaths();
+    return { success: "Status varian produk berhasil diubah." };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
 }
 
 export async function upsertChannelPriceAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = channelPriceSchema.safeParse({
-    variant_id: formData.get("variant_id"),
-    sales_channel_id: formData.get("sales_channel_id"),
-    selling_price: String(formData.get("selling_price") ?? ""),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-  const { variant_id, sales_channel_id, selling_price } = parsed.data;
-
   try {
+    const parsed = channelPriceSchema.safeParse({
+      variant_id: formData.get("variant_id"),
+      sales_channel_id: formData.get("sales_channel_id"),
+      selling_price: String(formData.get("selling_price") ?? ""),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+    const { variant_id, sales_channel_id, selling_price } = parsed.data;
+
     const saved = await prisma.$transaction(async (tx) => {
       const existing = await tx.variantChannelPrices.findUnique({
         where: {
@@ -369,7 +395,7 @@ export async function upsertChannelPriceAction(
       success: `Harga kanal berhasil disimpan (${saved.id.slice(0, 8)}).`,
     };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan harga kanal.");
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -377,20 +403,20 @@ export async function upsertSupplierPriceAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = supplierPriceSchema.safeParse({
-    variant_id: formData.get("variant_id"),
-    supplier_id: formData.get("supplier_id"),
-    purchase_price: String(formData.get("purchase_price") ?? ""),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-  const { variant_id, supplier_id, purchase_price } = parsed.data;
-
   try {
+    const parsed = supplierPriceSchema.safeParse({
+      variant_id: formData.get("variant_id"),
+      supplier_id: formData.get("supplier_id"),
+      purchase_price: String(formData.get("purchase_price") ?? ""),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+    const { variant_id, supplier_id, purchase_price } = parsed.data;
+
     const saved = await prisma.$transaction(async (tx) => {
       const existing = await tx.variantSuppliers.findUnique({
         where: { variant_id_supplier_id: { variant_id, supplier_id } },
@@ -424,6 +450,6 @@ export async function upsertSupplierPriceAction(
       success: `Harga beli berhasil disimpan (${saved.id.slice(0, 8)}).`,
     };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan harga beli.");
+    return { error: getErrorMessage(error) };
   }
 }

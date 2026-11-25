@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { Button, Input, Label } from "@/components/ui";
 
 type Fields = {
   currentPassword: string;
@@ -63,13 +64,13 @@ export function ChangePasswordForm() {
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
       <div>
-        <label
+        <Label
           htmlFor="currentPassword"
-          className="block text-sm font-medium text-zinc-800"
+          className="block text-sm font-medium text-slate-800"
         >
           Password saat ini
-        </label>
-        <input
+        </Label>
+        <Input
           id="currentPassword"
           name="currentPassword"
           type="password"
@@ -77,17 +78,17 @@ export function ChangePasswordForm() {
           required
           value={fields.currentPassword}
           onChange={(event) => update("currentPassword", event.target.value)}
-          className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-900 focus:outline-none"
+          className="mt-1 h-10 bg-white"
         />
       </div>
       <div>
-        <label
+        <Label
           htmlFor="newPassword"
-          className="block text-sm font-medium text-zinc-800"
+          className="block text-sm font-medium text-slate-800"
         >
           Password baru
-        </label>
-        <input
+        </Label>
+        <Input
           id="newPassword"
           name="newPassword"
           type="password"
@@ -97,17 +98,17 @@ export function ChangePasswordForm() {
           maxLength={128}
           value={fields.newPassword}
           onChange={(event) => update("newPassword", event.target.value)}
-          className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-900 focus:outline-none"
+          className="mt-1 h-10 bg-white"
         />
       </div>
       <div>
-        <label
+        <Label
           htmlFor="confirmPassword"
-          className="block text-sm font-medium text-zinc-800"
+          className="block text-sm font-medium text-slate-800"
         >
           Konfirmasi password baru
-        </label>
-        <input
+        </Label>
+        <Input
           id="confirmPassword"
           name="confirmPassword"
           type="password"
@@ -116,11 +117,11 @@ export function ChangePasswordForm() {
           maxLength={128}
           value={fields.confirmPassword}
           onChange={(event) => update("confirmPassword", event.target.value)}
-          className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-900 focus:outline-none"
+          className="mt-1 h-10 bg-white"
         />
       </div>
       {error ? (
-        <p className="text-sm text-red-600" role="alert">
+        <p className="text-sm text-rose-600" role="alert">
           {error}
         </p>
       ) : null}
@@ -129,13 +130,13 @@ export function ChangePasswordForm() {
           {success}
         </p>
       ) : null}
-      <button
+      <Button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+        className="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
       >
         {pending ? "Memproses..." : "Simpan Password"}
-      </button>
+      </Button>
     </form>
   );
 }

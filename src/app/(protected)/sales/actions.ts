@@ -3,10 +3,11 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import {
   optionalTextSchema,
@@ -105,45 +106,45 @@ export async function createSaleAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const variantIds = formData.getAll("variant_id");
-  const quantities = formData.getAll("qty");
-  const unitPrices = formData.getAll("unit_price");
-  const itemDiscounts = formData.getAll("item_discount");
-
-  const parsed = createSaleSchema.safeParse({
-    sales_channel_id: formData.get("sales_channel_id"),
-    transaction_date: parseDateInput(formData.get("transaction_date")),
-    external_order_number: formData.get("external_order_number"),
-    package_size_id: formData.get("package_size_id"),
-    package_count: formData.get("package_count"),
-    discount_amount: formData.get("discount_amount"),
-    additional_fee_amount: formData.get("additional_fee_amount"),
-    items: variantIds.map((variantId, index) => ({
-      variant_id: variantId,
-      qty: quantities[index],
-      unit_selling_price: unitPrices[index],
-      discount_amount: itemDiscounts[index] ?? "0",
-    })),
-    packaging_overrides: readUsageRows(
-      formData,
-      "packaging_material_id",
-      "actual_usage_qty",
-    ),
-    extra_materials: readUsageRows(
-      formData,
-      "extra_material_id",
-      "extra_usage_qty",
-    ),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const data = parsed.data;
-  const user = await requireAuth();
-
   try {
+    const variantIds = formData.getAll("variant_id");
+    const quantities = formData.getAll("qty");
+    const unitPrices = formData.getAll("unit_price");
+    const itemDiscounts = formData.getAll("item_discount");
+
+    const parsed = createSaleSchema.safeParse({
+      sales_channel_id: formData.get("sales_channel_id"),
+      transaction_date: parseDateInput(formData.get("transaction_date")),
+      external_order_number: formData.get("external_order_number"),
+      package_size_id: formData.get("package_size_id"),
+      package_count: formData.get("package_count"),
+      discount_amount: formData.get("discount_amount"),
+      additional_fee_amount: formData.get("additional_fee_amount"),
+      items: variantIds.map((variantId, index) => ({
+        variant_id: variantId,
+        qty: quantities[index],
+        unit_selling_price: unitPrices[index],
+        discount_amount: itemDiscounts[index] ?? "0",
+      })),
+      packaging_overrides: readUsageRows(
+        formData,
+        "packaging_material_id",
+        "actual_usage_qty",
+      ),
+      extra_materials: readUsageRows(
+        formData,
+        "extra_material_id",
+        "extra_usage_qty",
+      ),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const data = parsed.data;
+    const user = await requireAuth();
+
     const created = await prisma.$transaction(async (tx) => {
       const [channel, settings, variants, packageSize] = await Promise.all([
         tx.salesChannels.findFirst({
@@ -468,6 +469,6 @@ export async function createSaleAction(
       success: `Transaksi ${created.transaction_number} berhasil dicatat.`,
     };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan transaksi penjualan.");
+    return { error: getErrorMessage(error) };
   }
 }

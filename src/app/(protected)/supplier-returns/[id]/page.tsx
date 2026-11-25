@@ -4,6 +4,12 @@ import {
   PageHeading,
   Panel,
   StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   secondaryButtonClass,
 } from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
@@ -15,10 +21,6 @@ import type {
 } from "../types";
 
 export const instant = false;
-
-const thClass =
-  "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
 export default async function SupplierReturnDetailPage({
   params,
@@ -105,49 +107,47 @@ export default async function SupplierReturnDetailPage({
           <StatusBadge status={detail.resolution_type} />
         </Panel>
         <Panel title="Nominal Final">
-          <p className="text-lg font-semibold text-zinc-900">
+          <p className="text-lg font-semibold text-slate-900">
             {formatRupiah(detail.return_amount)}
           </p>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-slate-500">
             Otomatis {formatRupiah(detail.calculated_return_amount)}
           </p>
         </Panel>
         <Panel title="Tanggal Realisasi">
-          <p className="text-lg font-semibold text-zinc-900">
+          <p className="text-lg font-semibold text-slate-900">
             {detail.settlement_date
               ? new Date(detail.settlement_date).toLocaleDateString("id-ID")
               : "-"}
           </p>
         </Panel>
         <Panel title="Alasan">
-          <p className="text-sm text-zinc-800">{detail.reason}</p>
+          <p className="text-sm text-slate-800">{detail.reason}</p>
         </Panel>
       </div>
 
       <div className="mt-6">
         <Panel title="Barang Diretur">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className={thClass}>Varian</th>
-                  <th className={thClass}>Jumlah</th>
-                  <th className={thClass}>Harga Satuan</th>
-                  <th className={thClass}>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className={tdClass}>{item.variant_label}</td>
-                    <td className={tdClass}>{formatNumber(item.qty)}</td>
-                    <td className={tdClass}>{formatRupiah(item.unit_price)}</td>
-                    <td className={tdClass}>{formatRupiah(item.subtotal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="min-w-full divide-y divide-slate-200">
+            <TableHeader className="bg-slate-50">
+              <TableRow className="hover:bg-teal-50/40">
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Varian</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jumlah</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Harga Satuan</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {items.map((item) => (
+                <TableRow key={item.id} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{item.variant_label}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatNumber(item.qty)}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.unit_price)}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.subtotal)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Panel>
       </div>
     </>

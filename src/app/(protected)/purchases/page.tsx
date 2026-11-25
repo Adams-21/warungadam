@@ -1,15 +1,23 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import {
+  Button,
   DateRangeFields,
   EmptyState,
+  Label,
   PageHeading,
   Panel,
   StatusBadge,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -89,9 +97,6 @@ export default async function PurchasesPage({
     item_count: purchase._count.items,
   }));
 
-  const thClass =
-    "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-  const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
   return (
     <>
@@ -114,27 +119,32 @@ export default async function PurchasesPage({
       <Panel title="Filter Pesanan" description="Sesuaikan daftar berdasarkan status, supplier, status pembayaran, atau tanggal.">
         <form method="get" className="grid gap-3 md:grid-cols-5">
           <div>
-            <label htmlFor="status" className="text-sm font-medium">
+            <Label htmlFor="status" className="text-sm font-medium">
               Status pesanan
-            </label>
-            <select id="status" name="status" className={inputClass} defaultValue={status}>
+            </Label>
+            <SelectField
+              name="status"
+              defaultValue={status}
+              id="status"
+              className="mt-1 h-10 w-full bg-white"
+            >
               <option value="">Semua status</option>
               {PURCHASE_STATUSES.map((value) => (
                 <option key={value} value={value}>
                   {purchaseStatusLabel(value)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
-            <label htmlFor="supplier_id" className="text-sm font-medium">
+            <Label htmlFor="supplier_id" className="text-sm font-medium">
               Supplier
-            </label>
-            <select
-              id="supplier_id"
+            </Label>
+            <SelectField
               name="supplier_id"
-              className={inputClass}
               defaultValue={supplierRaw}
+              id="supplier_id"
+              className="mt-1 h-10 w-full bg-white"
             >
               <option value="">Semua supplier</option>
               {supplierViews.map((supplier) => (
@@ -142,17 +152,17 @@ export default async function PurchasesPage({
                   {supplier.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
-            <label htmlFor="payment_status" className="text-sm font-medium">
+            <Label htmlFor="payment_status" className="text-sm font-medium">
               Status pembayaran
-            </label>
-            <select
-              id="payment_status"
+            </Label>
+            <SelectField
               name="payment_status"
-              className={inputClass}
               defaultValue={paymentStatus}
+              id="payment_status"
+              className="mt-1 h-10 w-full bg-white"
             >
               <option value="">Semua pembayaran</option>
               {PAYMENT_STATUSES.map((value) => (
@@ -160,77 +170,102 @@ export default async function PurchasesPage({
                   {paymentStatusLabel(value)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <DateRangeFields from={dateFrom} to={dateTo} />
           <div className="flex items-end">
-            <button type="submit" className={secondaryButtonClass}>
+            <Button type="submit" className={secondaryButtonClass}>
               Terapkan Filter
-            </button>
+            </Button>
           </div>
         </form>
       </Panel>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-zinc-200">
-          <thead className="bg-zinc-50">
-            <tr>
-              <th className={thClass}>Nomor PO</th>
-              <th className={thClass}>Supplier</th>
-              <th className={thClass}>Tanggal</th>
-              <th className={thClass}>Total</th>
-              <th className={thClass}>Status Penerimaan</th>
-              <th className={thClass}>Status Pembayaran</th>
-              <th className={thClass}>Item</th>
-              <th className={thClass}>Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Nomor PO
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Supplier
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tanggal
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Total
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Status Penerimaan
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Status Pembayaran
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Item
+              </TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Aksi
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
             {purchaseViews.length === 0 ? (
-              <tr>
-                <td className={tdClass} colSpan={8}>
+              <TableRow className="hover:bg-teal-50/40">
+                <TableCell
+                  className="px-3 py-3 align-top text-sm text-slate-800"
+                  colSpan={8}
+                >
                   <EmptyState
                     compact
                     title="Belum ada pesanan pembelian"
                     description="Belum ada pesanan pembelian yang cocok dengan filter."
                   />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               purchaseViews.map((purchase) => (
-                <tr key={purchase.id}>
-                  <td className={`${tdClass} font-medium`}>
+                <TableRow key={purchase.id} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                     {purchase.purchase_number}
-                  </td>
-                  <td className={tdClass}>{purchase.supplier_name}</td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    {purchase.supplier_name}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     {new Date(purchase.purchase_date).toLocaleDateString("id-ID")}
-                  </td>
-                  <td className={tdClass}>{formatRupiah(purchase.total_amount)}</td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    {formatRupiah(purchase.total_amount)}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <StatusBadge status={purchase.status}>
                       {purchaseStatusLabel(purchase.status)}
                     </StatusBadge>
-                  </td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <StatusBadge status={purchase.payment_status}>
                       {paymentStatusLabel(purchase.payment_status)}
                     </StatusBadge>
-                  </td>
-                  <td className={tdClass}>{purchase.item_count}</td>
-                  <td className={tdClass}>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    {purchase.item_count}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                     <Link
                       href={`/purchases/${purchase.id}`}
-                      className="font-medium text-zinc-900 underline"
+                      className="font-medium text-slate-900 underline"
                     >
                       Detail
                     </Link>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </>
   );

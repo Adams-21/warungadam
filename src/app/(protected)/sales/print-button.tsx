@@ -1,15 +1,15 @@
 "use client";
 
-import { secondaryButtonClass } from "@/components/ui";
+import { Button, secondaryButtonClass } from "@/components/ui";
 
 export function PrintSaleButton() {
   return (
-    <button
+    <Button
       type="button"
       onClick={() => window.print()}
       className={secondaryButtonClass}
     >
       Cetak Nota
-    </button>
+    </Button>
   );
 }

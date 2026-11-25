@@ -4,10 +4,11 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { generateDocumentNumber } from "@/lib/sequence";
 import { prisma } from "@/lib/prisma";
 import {
@@ -46,37 +47,38 @@ export async function createPurchaseAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const variantIds = formData.getAll("variant_id");
-  const orderedQtys = formData.getAll("ordered_qty");
-  const unitPrices = formData.getAll("unit_price");
-
-  const parsed = createPurchaseSchema.safeParse({
-    supplier_id: formData.get("supplier_id"),
-    purchase_date: parseDateInput(formData.get("purchase_date")),
-    payment_type: formData.get("payment_type"),
-    due_date: parseDateInput(formData.get("due_date")),
-    notes: formData.get("notes"),
-    items: variantIds.map((variantId, index) => ({
-      variant_id: variantId,
-      ordered_qty: orderedQtys[index],
-      unit_price: unitPrices[index],
-    })),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const itemIds = parsed.data.items.map((item) => item.variant_id);
-  const lineError = validatePurchaseLines(parsed.data.items);
-  if (lineError) {
-    return { error: lineError };
-  }
-
-  const user = await requireAuth();
   let createdPurchaseId: string | null = null;
 
   try {
+    const variantIds = formData.getAll("variant_id");
+    const orderedQtys = formData.getAll("ordered_qty");
+    const unitPrices = formData.getAll("unit_price");
+
+    const parsed = createPurchaseSchema.safeParse({
+      supplier_id: formData.get("supplier_id"),
+      purchase_date: parseDateInput(formData.get("purchase_date")),
+      payment_type: formData.get("payment_type"),
+      due_date: parseDateInput(formData.get("due_date")),
+      notes: formData.get("notes"),
+      items: variantIds.map((variantId, index) => ({
+        variant_id: variantId,
+        ordered_qty: orderedQtys[index],
+        unit_price: unitPrices[index],
+      })),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const itemIds = parsed.data.items.map((item) => item.variant_id);
+    const lineError = validatePurchaseLines(parsed.data.items);
+    if (lineError) {
+      return { error: lineError };
+    }
+
+    const user = await requireAuth();
+
     const [supplier, variants] = await Promise.all([
       prisma.suppliers.findFirst({
         where: { id: parsed.data.supplier_id, is_active: true },
@@ -145,7 +147,7 @@ export async function createPurchaseAction(
       revalidatePath(path);
     }
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan pesanan pembelian.");
+    return { error: getErrorMessage(error) };
   }
 
   if (!createdPurchaseId) {

@@ -1,14 +1,27 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   ActionMessage,
+  Input,
+  Label,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SubmitButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   inputClass,
-  secondaryButtonClass,
 } from "@/components/ui";
-import { EMPTY_ACTION_STATE } from "@/lib/action-state";
+import { CompactActionForm } from "@/components/compact-action-form";
+import { EMPTY_ACTION_STATE, type ActionState } from "@/lib/action-state";
 import { formatNumber } from "@/lib/format";
 import {
   createExpenseCategoryAction,
@@ -23,26 +36,22 @@ import type {
   ExpenseCategoryView,
 } from "./types";
 
-const thClass =
-  "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
-
 function ToggleForm({
   action,
   id,
   active,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<ActionState>;
   id: string;
   active: boolean;
 }) {
   return (
-    <form action={action}>
+    <CompactActionForm
+      action={action}
+      submitLabel={active ? "Nonaktifkan" : "Aktifkan"}
+    >
       <input type="hidden" name="id" value={id} />
-      <button type="submit" className={secondaryButtonClass}>
-        {active ? "Nonaktifkan" : "Aktifkan"}
-      </button>
-    </form>
+    </CompactActionForm>
   );
 }
 
@@ -55,6 +64,10 @@ function BusinessSettingsForm({
     updateBusinessSettingsAction,
     EMPTY_ACTION_STATE,
   );
+  const [timeout, setTimeout] = useState(
+    String(settings.session_timeout_minutes),
+  );
+  const hasCustomTimeout = !["15", "30", "60", "120"].includes(timeout);
 
   return (
     <Panel
@@ -64,22 +77,22 @@ function BusinessSettingsForm({
       <form action={formAction} className="space-y-3">
         <input type="hidden" name="id" value={settings.id} />
         <div>
-          <label htmlFor="settings-name" className="text-sm font-medium">
+          <Label htmlFor="settings-name" className="text-sm font-medium">
             Nama bisnis
-          </label>
-          <input
+          </Label>
+          <Input
             id="settings-name"
             name="business_name"
             required
             defaultValue={settings.business_name}
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="settings-address" className="text-sm font-medium">
+            <Label htmlFor="settings-address" className="text-sm font-medium">
               Alamat
-            </label>
+            </Label>
             <textarea
               id="settings-address"
               name="address"
@@ -89,23 +102,23 @@ function BusinessSettingsForm({
             />
           </div>
           <div>
-            <label htmlFor="settings-phone" className="text-sm font-medium">
+            <Label htmlFor="settings-phone" className="text-sm font-medium">
               Telepon
-            </label>
-            <input
+            </Label>
+            <Input
               id="settings-phone"
               name="phone"
               defaultValue={settings.phone}
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
             />
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="settings-rate" className="text-sm font-medium">
+            <Label htmlFor="settings-rate" className="text-sm font-medium">
               Rate admin default (%)
-            </label>
-            <input
+            </Label>
+            <Input
               id="settings-rate"
               name="default_admin_fee_rate"
               type="number"
@@ -114,24 +127,36 @@ function BusinessSettingsForm({
               step="0.01"
               required
               defaultValue={settings.default_admin_fee_rate}
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
             />
           </div>
           <div>
-            <label htmlFor="settings-timeout" className="text-sm font-medium">
-              Timeout sesi (menit)
-            </label>
-            <input
-              id="settings-timeout"
-              name="session_timeout_minutes"
-              type="number"
-              min="1"
-              max="1440"
-              step="1"
-              required
-              defaultValue={settings.session_timeout_minutes}
-              className={inputClass}
-            />
+            <Label htmlFor="settings-timeout" className="text-sm font-medium">
+              Timeout sesi
+            </Label>
+            <input type="hidden" name="session_timeout_minutes" value={timeout} />
+            <Select
+              value={timeout}
+              onValueChange={(value) => setTimeout(value ?? "15")}
+            >
+              <SelectTrigger
+                id="settings-timeout"
+                className="mt-1 h-10 w-full bg-white"
+              >
+                <SelectValue placeholder="Pilih timeout sesi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 Menit</SelectItem>
+                <SelectItem value="30">30 Menit</SelectItem>
+                <SelectItem value="60">1 Jam</SelectItem>
+                <SelectItem value="120">Maksimal 2 Jam</SelectItem>
+                {hasCustomTimeout ? (
+                  <SelectItem value={timeout}>
+                    {timeout} Menit (saat ini)
+                  </SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <ActionMessage state={state} />
@@ -154,25 +179,25 @@ function SalesChannelForm() {
     >
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="channel-name" className="text-sm font-medium">
+          <Label htmlFor="channel-name" className="text-sm font-medium">
             Nama kanal
-          </label>
-          <input
+          </Label>
+          <Input
             id="channel-name"
             name="name"
             required
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
             placeholder="Contoh: Toko Pusat"
           />
         </div>
-        <label className="flex items-center gap-2 text-sm text-zinc-800">
-          <input
+        <Label className="flex items-center gap-2 text-sm text-slate-800">
+          <Input
             type="checkbox"
             name="is_marketplace"
-            className="h-4 w-4 rounded border-zinc-300"
+            className="h-4 w-4 rounded border-slate-300"
           />
           Marketplace
-        </label>
+        </Label>
         <ActionMessage state={state} />
         <SubmitButton pending={pending}>Tambah Kanal</SubmitButton>
       </form>
@@ -193,14 +218,14 @@ function ExpenseCategoryForm() {
     >
       <form action={formAction} className="space-y-3">
         <div>
-          <label htmlFor="expense-category-name" className="text-sm font-medium">
+          <Label htmlFor="expense-category-name" className="text-sm font-medium">
             Nama kategori
-          </label>
-          <input
+          </Label>
+          <Input
             id="expense-category-name"
             name="name"
             required
-            className={inputClass}
+            className="mt-1 h-10 bg-white"
             placeholder="Contoh: Listrik"
           />
         </div>
@@ -234,68 +259,64 @@ export function SettingsManager({
           title="Daftar Kanal Penjualan"
           description={`${channels.length} kanal terdaftar.`}
         >
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead>
-                <tr>
-                  <th className={thClass}>Nama</th>
-                  <th className={thClass}>Jenis</th>
-                  <th className={thClass}>Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {channels.map((channel) => (
-                  <tr key={channel.id}>
-                    <td className={tdClass}>{channel.name}</td>
-                    <td className={tdClass}>
-                      {channel.is_marketplace ? "Marketplace" : "Toko"}
-                    </td>
-                    <td className={tdClass}>
-                      <ToggleForm
-                        action={toggleSalesChannelActiveAction}
-                        id={channel.id}
-                        active={channel.is_active}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="min-w-full divide-y divide-slate-200">
+            <TableHeader>
+              <TableRow className="hover:bg-teal-50/40">
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nama</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jenis</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {channels.map((channel) => (
+                <TableRow key={channel.id} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{channel.name}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    {channel.is_marketplace ? "Marketplace" : "Toko"}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <ToggleForm
+                      action={toggleSalesChannelActiveAction}
+                      id={channel.id}
+                      active={channel.is_active}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Panel>
 
         <Panel
           title="Daftar Kategori Pengeluaran"
           description={`${expenseCategories.length} kategori terdaftar.`}
         >
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead>
-                <tr>
-                  <th className={thClass}>Nama</th>
-                  <th className={thClass}>Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {expenseCategories.map((category) => (
-                  <tr key={category.id}>
-                    <td className={tdClass}>{category.name}</td>
-                    <td className={tdClass}>
-                      <ToggleForm
-                        action={toggleExpenseCategoryActiveAction}
-                        id={category.id}
-                        active={category.is_active}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="min-w-full divide-y divide-slate-200">
+            <TableHeader>
+              <TableRow className="hover:bg-teal-50/40">
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nama</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {expenseCategories.map((category) => (
+                <TableRow key={category.id} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{category.name}</TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <ToggleForm
+                      action={toggleExpenseCategoryActiveAction}
+                      id={category.id}
+                      active={category.is_active}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Panel>
       </div>
 
-      <p className="text-sm text-zinc-600">
+      <p className="text-sm text-slate-600">
         Rate admin saat ini: {formatNumber(settings.default_admin_fee_rate, 2)}%
       </p>
     </div>

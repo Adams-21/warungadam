@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button, Input, Label } from "@/components/ui";
 import { loginAction, type LoginState } from "./actions";
 
 const initialState: LoginState = {};
@@ -11,49 +12,49 @@ export function LoginForm() {
   return (
     <form action={formAction} className="mt-6 space-y-4">
       <div>
-        <label
+        <Label
           htmlFor="username"
-          className="block text-sm font-medium text-zinc-800"
+          className="block text-sm font-medium text-slate-800"
         >
           Username
-        </label>
-        <input
+        </Label>
+        <Input
           id="username"
           name="username"
           type="text"
           autoComplete="username"
           required
-          className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+          className="mt-1 h-10 bg-white"
         />
       </div>
       <div>
-        <label
+        <Label
           htmlFor="password"
-          className="block text-sm font-medium text-zinc-800"
+          className="block text-sm font-medium text-slate-800"
         >
           Password
-        </label>
-        <input
+        </Label>
+        <Input
           id="password"
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+          className="mt-1 h-10 bg-white"
         />
       </div>
       {state.error ? (
-        <p className="text-sm text-red-600" role="alert">
+        <p className="text-sm text-rose-600" role="alert">
           {state.error}
         </p>
       ) : null}
-      <button
+      <Button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Memproses..." : "Masuk"}
-      </button>
+      </Button>
     </form>
   );
 }

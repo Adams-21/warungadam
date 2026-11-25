@@ -3,11 +3,13 @@
 import { useActionState } from "react";
 import {
   ActionMessage,
+  Input,
+  Label,
   Panel,
   SubmitButton,
   inputClass,
-  secondaryButtonClass,
 } from "@/components/ui";
+import { CompactActionForm } from "@/components/compact-action-form";
 import { EMPTY_ACTION_STATE } from "@/lib/action-state";
 import {
   createSupplierAction,
@@ -16,8 +18,6 @@ import {
   updateSupplierAction,
 } from "./actions";
 import type { SupplierView } from "./types";
-
-const tdClass = "px-3 py-3 align-top text-sm text-zinc-800";
 
 function SupplierCreateForm() {
   const [state, formAction, pending] = useActionState(
@@ -33,40 +33,40 @@ function SupplierCreateForm() {
       <form action={formAction} className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="supplier-create-name" className="text-sm font-medium">
+            <Label htmlFor="supplier-create-name" className="text-sm font-medium">
               Nama supplier
-            </label>
-            <input
+            </Label>
+            <Input
               id="supplier-create-name"
               name="name"
               required
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="Contoh: PT Sumber Rejeki"
             />
           </div>
           <div>
-            <label
+            <Label
               htmlFor="supplier-create-phone"
               className="text-sm font-medium"
             >
               Telepon
-            </label>
-            <input
+            </Label>
+            <Input
               id="supplier-create-phone"
               name="phone"
               required
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
               placeholder="0812..."
             />
           </div>
         </div>
         <div>
-          <label
+          <Label
             htmlFor="supplier-create-address"
             className="text-sm font-medium"
           >
             Alamat
-          </label>
+          </Label>
           <textarea
             id="supplier-create-address"
             name="address"
@@ -76,9 +76,9 @@ function SupplierCreateForm() {
           />
         </div>
         <div>
-          <label htmlFor="supplier-create-notes" className="text-sm font-medium">
+          <Label htmlFor="supplier-create-notes" className="text-sm font-medium">
             Catatan
-          </label>
+          </Label>
           <textarea
             id="supplier-create-notes"
             name="notes"
@@ -103,41 +103,41 @@ function SupplierEditForm({ supplier }: { supplier: SupplierView }) {
 
   return (
     <details className="mt-3">
-      <summary className="cursor-pointer text-sm font-medium text-zinc-800 hover:text-zinc-950">
+      <summary className="cursor-pointer text-sm font-medium text-slate-800 hover:text-slate-950">
         Edit data
       </summary>
       <form action={formAction} className="mt-3 space-y-3">
         <input type="hidden" name="id" value={supplier.id} />
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor={`${formId}-name`} className="text-sm font-medium">
+            <Label htmlFor={`${formId}-name`} className="text-sm font-medium">
               Nama supplier
-            </label>
-            <input
+            </Label>
+            <Input
               id={`${formId}-name`}
               name="name"
               required
               defaultValue={supplier.name}
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
             />
           </div>
           <div>
-            <label htmlFor={`${formId}-phone`} className="text-sm font-medium">
+            <Label htmlFor={`${formId}-phone`} className="text-sm font-medium">
               Telepon
-            </label>
-            <input
+            </Label>
+            <Input
               id={`${formId}-phone`}
               name="phone"
               required
               defaultValue={supplier.phone}
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
             />
           </div>
         </div>
         <div>
-          <label htmlFor={`${formId}-address`} className="text-sm font-medium">
+          <Label htmlFor={`${formId}-address`} className="text-sm font-medium">
             Alamat
-          </label>
+          </Label>
           <textarea
             id={`${formId}-address`}
             name="address"
@@ -147,9 +147,9 @@ function SupplierEditForm({ supplier }: { supplier: SupplierView }) {
           />
         </div>
         <div>
-          <label htmlFor={`${formId}-notes`} className="text-sm font-medium">
+          <Label htmlFor={`${formId}-notes`} className="text-sm font-medium">
             Catatan
-          </label>
+          </Label>
           <textarea
             id={`${formId}-notes`}
             name="notes"
@@ -179,7 +179,7 @@ export function SuppliersManager({
         description={`${suppliers.length} supplier terdaftar.`}
       >
         {suppliers.length === 0 ? (
-          <p className="text-sm text-zinc-600">Belum ada supplier.</p>
+          <p className="text-sm text-slate-600">Belum ada supplier.</p>
         ) : (
           <div className="space-y-3">
             {suppliers.map((supplier) => {
@@ -189,55 +189,49 @@ export function SuppliersManager({
               return (
                 <div
                   key={supplier.id}
-                  className="rounded-lg border border-zinc-200 p-4"
+                  className="rounded-lg border border-slate-200 p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-zinc-900">
+                      <p className="font-medium text-slate-900">
                         {supplier.name}
                       </p>
-                      <p className="mt-0.5 text-sm text-zinc-600">
+                      <p className="mt-0.5 text-sm text-slate-600">
                         {supplier.phone}
                       </p>
-                      <p className="mt-0.5 text-xs text-zinc-500">
+                      <p className="mt-0.5 text-xs text-slate-500">
                         {supplier.purchase_count} pembelian ·{" "}
                         {supplier.variant_count} varian
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <form action={toggleSupplierActiveAction}>
+                      <CompactActionForm
+                        action={toggleSupplierActiveAction}
+                        submitLabel={
+                          supplier.is_active ? "Nonaktifkan" : "Aktifkan"
+                        }
+                      >
                         <input type="hidden" name="id" value={supplier.id} />
-                        <button type="submit" className={secondaryButtonClass}>
-                          {supplier.is_active
-                            ? "Nonaktifkan"
-                            : "Aktifkan"}
-                        </button>
-                      </form>
-                      <form action={deleteSupplierAction}>
+                      </CompactActionForm>
+                      <CompactActionForm
+                        action={deleteSupplierAction}
+                        submitLabel="Hapus"
+                        buttonClassName={`rounded-md border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50${
+                          isReferenced ? " pointer-events-none opacity-50" : ""
+                        }`}
+                      >
                         <input type="hidden" name="id" value={supplier.id} />
-                        <button
-                          type="submit"
-                          disabled={isReferenced}
-                          title={
-                            isReferenced
-                              ? "Supplier masih digunakan pembelian atau harga varian"
-                              : undefined
-                          }
-                          className="rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Hapus
-                        </button>
-                      </form>
+                      </CompactActionForm>
                     </div>
                   </div>
 
                   {supplier.address ? (
-                    <p className={`${tdClass} px-0 pb-0`}>
+                    <p className="px-3 py-3 align-top text-sm text-slate-800 px-0 pb-0">
                       Alamat: {supplier.address}
                     </p>
                   ) : null}
                   {supplier.notes ? (
-                    <p className={`${tdClass} px-0 pb-0`}>
+                    <p className="px-3 py-3 align-top text-sm text-slate-800 px-0 pb-0">
                       Catatan: {supplier.notes}
                     </p>
                   ) : null}

@@ -5,6 +5,12 @@ import {
   PageHeading,
   Panel,
   StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
 } from "@/components/ui";
 import { formatNumber, formatRupiah } from "@/lib/format";
@@ -166,9 +172,6 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     })),
   };
 
-  const thClass =
-    "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-  const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
   return (
     <>
@@ -191,51 +194,51 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
       >
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               No. Transaksi
             </dt>
-            <dd className="mt-1 text-sm font-medium text-zinc-900">
+            <dd className="mt-1 text-sm font-medium text-slate-900">
               {detail.transaction_number}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Tanggal
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
+            <dd className="mt-1 text-sm text-slate-900">
               {new Date(detail.transaction_date).toLocaleString("id-ID")}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Kanal
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">{detail.channel_name}</dd>
+            <dd className="mt-1 text-sm text-slate-900">{detail.channel_name}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Petugas
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">{detail.created_by}</dd>
+            <dd className="mt-1 text-sm text-slate-900">{detail.created_by}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               No. Eksternal
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
+            <dd className="mt-1 text-sm text-slate-900">
               {detail.external_order_number || "-"}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Ukuran Paket
             </dt>
-            <dd className="mt-1 text-sm text-zinc-900">
+            <dd className="mt-1 text-sm text-slate-900">
               {detail.package_size_name}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Status
             </dt>
             <dd className="mt-1 flex flex-wrap gap-2">
@@ -251,7 +254,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Stok Produk
             </dt>
             <dd className="mt-1">
@@ -266,58 +269,58 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Panel title="Penjualan Bruto">
-          <p className="text-xl font-semibold text-zinc-900">
+          <p className="text-xl font-semibold text-slate-900">
             {formatRupiah(detail.total_amount)}
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-slate-500">
             Subtotal {formatRupiah(detail.subtotal_amount)} · Diskon{" "}
             {formatRupiah(detail.discount_amount)} · Tambahan{" "}
             {formatRupiah(detail.additional_fee_amount)}
           </p>
         </Panel>
         <Panel title="HPP Produk (FIFO)">
-          <p className="text-xl font-semibold text-zinc-900">
+          <p className="text-xl font-semibold text-slate-900">
             {formatRupiah(detail.product_cogs)}
           </p>
         </Panel>
         <Panel title="HPP Kemasan">
-          <p className="text-xl font-semibold text-zinc-900">
+          <p className="text-xl font-semibold text-slate-900">
             {formatRupiah(detail.packaging_cogs)}
           </p>
         </Panel>
         <Panel title="Laba Kotor">
-          <p className="text-xl font-semibold text-zinc-900">
+          <p className="text-xl font-semibold text-slate-900">
             {formatRupiah(detail.gross_profit)}
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-slate-500">
             Estimasi admin {formatRupiah(detail.admin_fee_estimate_amount)} (
             {formatNumber(detail.admin_fee_estimate_rate, 2)}%)
           </p>
         </Panel>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-zinc-200">
-          <thead className="bg-zinc-50">
-            <tr>
-              <th className={thClass}>Varian</th>
-              <th className={thClass}>Jumlah</th>
-              <th className={thClass}>Harga Jual</th>
-              <th className={thClass}>Diskon</th>
-              <th className={thClass}>Subtotal</th>
-              <th className={thClass}>HPP FIFO</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
+      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow className="hover:bg-teal-50/40">
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Varian</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jumlah</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Harga Jual</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Diskon</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</TableHead>
+              <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">HPP FIFO</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-slate-100">
             {detail.items.map((item) => (
-              <tr key={item.id}>
-                <td className={`${tdClass} font-medium`}>
+              <TableRow key={item.id} className="hover:bg-teal-50/40">
+                <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                   {item.variant_label}
                   <div className="mt-2 space-y-1">
                     {item.allocations.map((allocation) => (
                       <p
                         key={allocation.batch_id}
-                        className="text-xs text-zinc-500"
+                        className="text-xs text-slate-500"
                       >
                         Batch {allocation.batch_id.slice(0, 8)} ·{" "}
                         {new Date(allocation.received_at).toLocaleDateString(
@@ -329,20 +332,20 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
                       </p>
                     ))}
                   </div>
-                </td>
-                <td className={tdClass}>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatNumber(item.qty, 4)} {item.unit_name}
-                </td>
-                <td className={tdClass}>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                   {formatRupiah(item.unit_selling_price)}
-                </td>
-                <td className={tdClass}>{formatRupiah(item.discount_amount)}</td>
-                <td className={tdClass}>{formatRupiah(item.subtotal_amount)}</td>
-                <td className={tdClass}>{formatRupiah(item.total_hpp_fifo)}</td>
-              </tr>
+                </TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.discount_amount)}</TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.subtotal_amount)}</TableCell>
+                <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.total_hpp_fifo)}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -354,42 +357,42 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
               description="Transaksi ini tidak memakai material kemasan."
             />
           ) : (
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead>
-                <tr>
-                  <th className={thClass}>Material</th>
-                  <th className={thClass}>Standar</th>
-                  <th className={thClass}>Aktual</th>
-                  <th className={thClass}>HPP</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-teal-50/40">
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Material</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Standar</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aktual</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">HPP</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-slate-100">
                 {detail.packaging_usages.map((usage) => (
-                  <tr key={usage.id}>
-                    <td className={`${tdClass} font-medium`}>
+                  <TableRow key={usage.id} className="hover:bg-teal-50/40">
+                    <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                       {usage.material_name}
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {formatNumber(usage.standard_usage_qty, 4)}{" "}
                       {usage.usage_unit_name}
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {formatNumber(usage.actual_usage_qty, 4)}{" "}
                       {usage.usage_unit_name}
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {formatRupiah(usage.final_hpp)}
-                      <span className="block text-xs text-zinc-500">
+                      <span className="block text-xs text-slate-500">
                         Hitung {formatRupiah(usage.calculated_hpp)}
                         {usage.adjusted_hpp !== null
                           ? ` · Disesuaikan ${formatRupiah(usage.adjusted_hpp)}`
                           : ""}
                       </span>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </Panel>
 
@@ -401,16 +404,16 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
               {detail.status_histories.map((history) => (
                 <div
                   key={history.id}
-                  className="rounded-lg border border-zinc-200 p-3"
+                  className="rounded-lg border border-slate-200 p-3"
                 >
-                  <p className="text-sm font-medium text-zinc-900">
+                  <p className="text-sm font-medium text-slate-900">
                     {history.status_group}: {history.new_status}
                   </p>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     {new Date(history.created_at).toLocaleString("id-ID")}
                   </p>
                   {history.reason ? (
-                    <p className="mt-1 text-xs text-zinc-600">
+                    <p className="mt-1 text-xs text-slate-600">
                       {history.reason}
                     </p>
                   ) : null}

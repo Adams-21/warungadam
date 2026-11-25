@@ -1,24 +1,29 @@
 import { SupplierReturnResolution } from "@prisma/client";
 import Link from "next/link";
 import {
+  Button,
   DateRangeFields,
   EmptyState,
+  Input,
+  Label,
   PageHeading,
   Panel,
   StatusBadge,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { buildDateBounds } from "@/lib/date-range";
 import { formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import type { SupplierReturnListItemView } from "./types";
 
 export const instant = false;
-
-const thClass =
-  "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
 type SearchParams = Promise<{
   q?: string;
@@ -105,10 +110,10 @@ export default async function SupplierReturnsPage({
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Panel title="Jumlah Retur">
-          <p className="text-2xl font-semibold text-zinc-900">{views.length}</p>
+          <p className="text-2xl font-semibold text-slate-900">{views.length}</p>
         </Panel>
         <Panel title="Total Nominal Retur">
-          <p className="text-2xl font-semibold text-zinc-900">
+          <p className="text-2xl font-semibold text-slate-900">
             {formatRupiah(totalAmount)}
           </p>
         </Panel>
@@ -117,26 +122,27 @@ export default async function SupplierReturnsPage({
       <Panel title="Daftar Retur Supplier" description="Maksimal 200 retur terbaru ditampilkan.">
         <form method="get" className="mb-5 grid gap-3 md:grid-cols-[2fr_1fr_2fr_auto]">
           <div>
-            <label htmlFor="q" className="text-sm font-medium">
+            <Label htmlFor="q" className="text-sm font-medium">
               Nomor Retur
-            </label>
-            <input
+            </Label>
+            <Input
               id="q"
               name="q"
               defaultValue={query}
               placeholder="Cari nomor retur"
-              className={inputClass}
+              className="mt-1 h-10 bg-white"
             />
           </div>
           <div>
-            <label htmlFor="resolution_type" className="text-sm font-medium">
+            <Label htmlFor="resolution_type" className="text-sm font-medium">
               Penyelesaian
-            </label>
-            <select
-              id="resolution_type"
+            </Label>
+            <SelectField
               name="resolution_type"
               defaultValue={resolution ?? ""}
-              className={inputClass}
+              id="resolution_type"
+              className="mt-1 h-10 w-full bg-white"
+              placeholder="Semua"
             >
               <option value="">Semua</option>
               {Object.values(SupplierReturnResolution).map((item) => (
@@ -144,12 +150,12 @@ export default async function SupplierReturnsPage({
                   {item}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <DateRangeFields from={dateFrom} to={dateTo} />
-          <button type="submit" className="self-end rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
+          <Button type="submit" className="self-end rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">
             Filter
-          </button>
+          </Button>
         </form>
 
         {views.length === 0 ? (
@@ -159,54 +165,52 @@ export default async function SupplierReturnsPage({
             description="Belum ada retur supplier yang cocok dengan filter."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className={thClass}>Nomor</th>
-                  <th className={thClass}>Tanggal</th>
-                  <th className={thClass}>Pembelian</th>
-                  <th className={thClass}>Penyelesaian</th>
-                  <th className={thClass}>Nominal</th>
-                  <th className={thClass}>Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {views.map((row) => (
-                  <tr key={row.id}>
-                    <td className={tdClass}>
-                      <p className="font-medium text-zinc-900">{row.return_number}</p>
-                      <p className="text-xs text-zinc-500">{row.reason}</p>
-                    </td>
-                    <td className={tdClass}>
-                      {new Date(row.return_date).toLocaleDateString("id-ID")}
-                    </td>
-                    <td className={tdClass}>
-                      <p>{row.purchase_number}</p>
-                      <p className="text-xs text-zinc-500">{row.supplier_name}</p>
-                    </td>
-                    <td className={tdClass}>
-                      <StatusBadge status={row.resolution_type} />
-                    </td>
-                    <td className={tdClass}>
-                      <p>{formatRupiah(row.return_amount)}</p>
-                      <p className="text-xs text-zinc-500">
-                        Otomatis {formatRupiah(row.calculated_return_amount)}
-                      </p>
-                    </td>
-                    <td className={tdClass}>
-                      <Link
-                        href={`/supplier-returns/${row.id}`}
-                        className="font-medium text-zinc-900 underline"
-                      >
-                        Detail
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="min-w-full divide-y divide-slate-200">
+            <TableHeader className="bg-slate-50">
+              <TableRow className="hover:bg-teal-50/40">
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nomor</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Pembelian</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Penyelesaian</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nominal</TableHead>
+                <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {views.map((row) => (
+                <TableRow key={row.id} className="hover:bg-teal-50/40">
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <p className="font-medium text-slate-900">{row.return_number}</p>
+                    <p className="text-xs text-slate-500">{row.reason}</p>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    {new Date(row.return_date).toLocaleDateString("id-ID")}
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <p>{row.purchase_number}</p>
+                    <p className="text-xs text-slate-500">{row.supplier_name}</p>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <StatusBadge status={row.resolution_type} />
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <p>{formatRupiah(row.return_amount)}</p>
+                    <p className="text-xs text-slate-500">
+                      Otomatis {formatRupiah(row.calculated_return_amount)}
+                    </p>
+                  </TableCell>
+                  <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
+                    <Link
+                      href={`/supplier-returns/${row.id}`}
+                      className="font-medium text-slate-900 underline"
+                    >
+                      Detail
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </Panel>
     </>

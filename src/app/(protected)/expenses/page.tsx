@@ -1,13 +1,23 @@
 import { Prisma } from "@prisma/client";
 import {
+  Button,
+  Card,
   DateRangeFields,
   EmptyState,
+  Input,
+  Label,
   PageHeading,
   Panel,
   StatusBadge,
-  inputClass,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   primaryButtonClass,
 } from "@/components/ui";
+import { SelectField } from "@/components/select-field";
 import { requireAuth } from "@/lib/auth";
 import { formatNumber, formatRupiah } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -224,24 +234,21 @@ export default async function ExpensesPage({
   );
 
   const summaryCards = [
-    { label: "Pendapatan Penjualan", value: summary.totalRevenue, tone: "text-zinc-900" },
-    { label: "Total HPP", value: summary.totalCogs, tone: "text-zinc-900" },
-    { label: "Laba Kotor", value: summary.grossProfit, tone: "text-zinc-900" },
+    { label: "Pendapatan Penjualan", value: summary.totalRevenue, tone: "text-slate-900" },
+    { label: "Total HPP", value: summary.totalCogs, tone: "text-slate-900" },
+    { label: "Laba Kotor", value: summary.grossProfit, tone: "text-slate-900" },
     {
       label: "Total Biaya Operasional",
       value: summary.totalOperatingExpenses,
-      tone: "text-zinc-900",
+      tone: "text-slate-900",
     },
     {
       label: "Laba Bersih",
       value: summary.netProfit,
-      tone: summary.netProfit < 0 ? "text-red-600" : "text-green-700",
+      tone: summary.netProfit < 0 ? "text-rose-600" : "text-green-700",
     },
   ];
 
-  const thClass =
-    "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
-  const tdClass = "px-3 py-2 align-top text-sm text-zinc-800";
 
   return (
     <>
@@ -259,19 +266,19 @@ export default async function ExpensesPage({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map((card) => (
-          <div
+          <Card
             key={card.label}
-            className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
+            className="border-slate-200/80 bg-white p-5 shadow-sm"
           >
-            <p className="text-sm text-zinc-600">{card.label}</p>
-            <p className={`mt-2 text-lg font-semibold ${card.tone}`}>
+            <p className="text-sm text-slate-600">{card.label}</p>
+            <p className={`mt-2 text-lg font-semibold tabular-nums ${card.tone}`}>
               {formatRupiah(card.value)}
             </p>
-          </div>
+          </Card>
         ))}
       </div>
 
-      <p className="mt-2 text-sm text-zinc-600">
+      <p className="mt-2 text-sm text-slate-600">
         Periode {filters.date_from} s/d {filters.date_to} · HPP produk{" "}
         {formatRupiah(summary.productCogs)} · HPP kemasan{" "}
         {formatRupiah(summary.packagingCogs)}
@@ -296,16 +303,16 @@ export default async function ExpensesPage({
               method="get"
               className="grid w-full gap-3 md:grid-cols-4"
             >
-              <input
+              <Input
                 name="q"
                 defaultValue={filters.q}
                 placeholder="Cari deskripsi..."
-                className={inputClass}
+                className="mt-1 h-10 bg-white"
               />
-              <select
+              <SelectField
                 name="category_id"
                 defaultValue={filters.category_id}
-                className={inputClass}
+                className="mt-1 h-10 w-full bg-white"
               >
                 <option value="">Semua kategori</option>
                 {categories.map((category) => (
@@ -313,65 +320,64 @@ export default async function ExpensesPage({
                     {category.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               <DateRangeFields
                 from={filters.date_from}
                 to={filters.date_to}
               />
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-zinc-700">
-                  <input
+                <Label className="flex items-center gap-2 text-sm text-slate-700">
+                  <Input
                     type="checkbox"
                     name="include_void"
                     value="1"
                     defaultChecked={filters.include_void}
                   />
                   Tampilkan void
-                </label>
-                <button type="submit" className={primaryButtonClass}>
+                </Label>
+                <Button type="submit" className={primaryButtonClass}>
                   Filter
-                </button>
+                </Button>
               </div>
             </form>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead>
-                <tr>
-                  <th className={thClass}>Tanggal</th>
-                  <th className={thClass}>Kategori</th>
-                  <th className={thClass}>Deskripsi</th>
-                  <th className={thClass}>Nominal</th>
-                  <th className={thClass}>Status</th>
-                  <th className={thClass}>Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
+          <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-teal-50/40">
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Kategori</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Deskripsi</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nominal</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-slate-100">
                 {expenseViews.map((expense) => (
-                  <tr key={expense.id}>
-                    <td className={tdClass}>{expense.expense_date}</td>
-                    <td className={tdClass}>{expense.category_name}</td>
-                    <td className={tdClass}>
+                  <TableRow key={expense.id} className="hover:bg-teal-50/40">
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{expense.expense_date}</TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{expense.category_name}</TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       <p className="font-medium">{expense.description}</p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="text-xs text-slate-500">
                         {expense.created_by}
                       </p>
                       {expense.is_void ? (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-rose-600">
                           {expense.void_reason} · {expense.voided_by ?? "-"}
                         </p>
                       ) : null}
-                    </td>
-                    <td className={`${tdClass} font-medium`}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                       {formatRupiah(expense.amount)}
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       <StatusBadge
                         status={expense.is_void ? "Void" : "Aktif"}
                       />
-                    </td>
-                    <td className={tdClass}>
+                    </TableCell>
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                       {expense.can_manage ? (
                         <div className="flex gap-2">
                           <ExpenseFormModal
@@ -381,25 +387,24 @@ export default async function ExpensesPage({
                           <VoidExpenseModal expense={expense} />
                         </div>
                       ) : (
-                        <span className="text-xs text-zinc-400">-</span>
+                        <span className="text-xs text-slate-400">-</span>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {expenseViews.length === 0 ? (
-                  <tr>
-                    <td className={tdClass} colSpan={6}>
+                  <TableRow className="hover:bg-teal-50/40">
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800" colSpan={6}>
                       <EmptyState
                         compact
                         title="Tidak ada pengeluaran"
                         description="Tidak ada pengeluaran pada filter ini."
                       />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : null}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+          </Table>
         </Panel>
       </div>
 
@@ -408,17 +413,16 @@ export default async function ExpensesPage({
           title="Breakdown Pengeluaran per Kategori"
           description="Dihitung dari pengeluaran aktif pada periode terpilih."
         >
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200">
-              <thead>
-                <tr>
-                  <th className={thClass}>Kategori</th>
-                  <th className={thClass}>Jumlah Catatan</th>
-                  <th className={thClass}>Total</th>
-                  <th className={thClass}>Persentase</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
+          <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-teal-50/40">
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Kategori</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Jumlah Catatan</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total</TableHead>
+                  <TableHead className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Persentase</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-slate-100">
                 {breakdown.map((item) => {
                   const percentage =
                     periodAggregation.total === BigInt(0)
@@ -428,32 +432,31 @@ export default async function ExpensesPage({
                             periodAggregation.total,
                         ) / 100;
                   return (
-                    <tr key={item.category_id}>
-                      <td className={`${tdClass} font-medium`}>
+                    <TableRow key={item.category_id} className="hover:bg-teal-50/40">
+                      <TableCell className="px-3 py-3 align-top text-sm font-medium text-slate-800">
                         {item.category_name}
-                      </td>
-                      <td className={tdClass}>{item.count}</td>
-                      <td className={tdClass}>{formatRupiah(item.total)}</td>
-                      <td className={tdClass}>
+                      </TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{item.count}</TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">{formatRupiah(item.total)}</TableCell>
+                      <TableCell className="px-3 py-3 align-top text-sm text-slate-800">
                         {formatNumber(percentage, 2)}%
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
                 {breakdown.length === 0 ? (
-                  <tr>
-                    <td className={tdClass} colSpan={4}>
+                  <TableRow className="hover:bg-teal-50/40">
+                    <TableCell className="px-3 py-3 align-top text-sm text-slate-800" colSpan={4}>
                       <EmptyState
                         compact
                         title="Belum ada pengeluaran aktif"
                         description="Belum ada pengeluaran aktif pada periode ini."
                       />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : null}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+          </Table>
         </Panel>
       </div>
     </>

@@ -4,10 +4,11 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ActionError, toActionError } from "@/lib/action-error";
+import { ActionError } from "@/lib/action-error";
 import type { ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/activity";
 import { requireAuth } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/error-handler";
 import { prisma } from "@/lib/prisma";
 import { priceSchema, uuidSchema } from "@/lib/schemas";
 import { planStockAdjustment } from "./inventory-rules";
@@ -43,21 +44,21 @@ export async function adjustStockAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = adjustmentSchema.safeParse({
-    variant_id: formData.get("variant_id"),
-    direction: formData.get("direction"),
-    qty_change: formData.get("qty_change"),
-    unit_cost: formData.get("unit_cost"),
-    reason: formData.get("reason"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
-  }
-
-  const user = await requireAuth();
-
   try {
+    const parsed = adjustmentSchema.safeParse({
+      variant_id: formData.get("variant_id"),
+      direction: formData.get("direction"),
+      qty_change: formData.get("qty_change"),
+      unit_cost: formData.get("unit_cost"),
+      reason: formData.get("reason"),
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data tidak valid." };
+    }
+
+    const user = await requireAuth();
+
     await prisma.$transaction(async (tx) => {
       const variant = await tx.productVariants.findUnique({
         where: { id: parsed.data.variant_id },
@@ -180,6 +181,6 @@ export async function adjustStockAction(
     revalidateInventoryPaths();
     return { success: "Penyesuaian stok berhasil disimpan." };
   } catch (error) {
-    return toActionError(error, "Gagal menyimpan penyesuaian stok.");
+    return { error: getErrorMessage(error) };
   }
 }
